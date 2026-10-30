@@ -50,6 +50,19 @@ const { checkForUpdate, downloadUpdate, compareVersions } = require('../updater'
   };
   await launchInstaller('C:\\x\\setup.exe', ['/S'], { spawnImpl: fakeSpawn, retries: 2, delayMs: 1 });
   assert.deepStrictEqual(calls, ['C:\\x\\setup.exe', 'C:\\x\\setup.exe', 'cmd.exe']);
+  // Renommage : l'ancien fichier du même nom est remplacé, et EPERM persistant → copie sous un autre nom.
+  const { moveInto } = require('../updater');
+  const a = path.join(dir, 'a.part'), b = path.join(dir, 'b.exe');
+  fs.writeFileSync(a, 'neuf'); fs.writeFileSync(b, 'ancien');
+  assert.strictEqual(await moveInto(a, b), b);
+  assert.strictEqual(fs.readFileSync(b, 'utf8'), 'neuf');
+  const realRename = fs.renameSync;
+  fs.renameSync = () => { throw Object.assign(new Error('EPERM'), { code: 'EPERM' }); };
+  fs.writeFileSync(a, 'v3');
+  const alt = await moveInto(a, b, { tries: 2, delayMs: 1 });
+  fs.renameSync = realRename;
+  assert.notStrictEqual(alt, b);
+  assert.strictEqual(fs.readFileSync(alt, 'utf8'), 'v3');
   srv.close();
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('updater : OK');

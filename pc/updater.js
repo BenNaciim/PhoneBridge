@@ -75,12 +75,33 @@ async function downloadUpdate(info, dir, { onProgress, fetchImpl = fetch, allowH
   try {
     await pipeline(body, fs.createWriteStream(part));
     if (hash.digest('hex') !== info.sha256) throw new Error('Somme de contrôle incorrecte : fichier rejeté');
-    fs.renameSync(part, file);
+    return await moveInto(part, file);
   } catch (err) {
     fs.rmSync(part, { force: true });
     throw err;
   }
-  return file;
+}
+
+/**
+ * Renomme le fichier téléchargé. Windows répond EPERM/EBUSY tant qu'un antivirus analyse le fichier
+ * ou qu'un ancien installateur du même nom est encore ouvert : on réessaie, puis on change de nom.
+ */
+async function moveInto(part, file, { tries = 20, delayMs = 500 } = {}) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < tries; i++) {
+    try {
+      fs.rmSync(file, { force: true });
+      fs.renameSync(part, file);
+      return file;
+    } catch (err) {
+      if (!['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) throw err;
+      await sleep(delayMs);
+    }
+  }
+  const alt = file.replace(/\.exe$/i, `-${Date.now()}.exe`);
+  fs.copyFileSync(part, alt);
+  fs.rmSync(part, { force: true });
+  return alt;
 }
 
 /**
@@ -109,4 +130,4 @@ function launchInstaller(file, args, { spawnImpl = require('node:child_process')
   })();
 }
 
-module.exports = { checkForUpdate, downloadUpdate, launchInstaller, compareVersions, REPO };
+module.exports = { checkForUpdate, downloadUpdate, launchInstaller, moveInto, compareVersions, REPO };
