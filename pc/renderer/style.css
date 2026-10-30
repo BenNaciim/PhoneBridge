@@ -154,10 +154,14 @@ html[data-theme=light] .chip.on{color:#fff}
 .updatebar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:16px}
 .updatebar .link{font-size:18px;text-decoration:none}
 
+/* Onglet Notifications : page entière (sur grand écran la colonne de droite reste visible dans Messages) */
+.grid.show-notifs #threadsCol,.grid.show-notifs #chatCol{display:none}
+.grid.show-notifs #notifCol{grid-column:2/5}
+.grid.show-notifs #notifs{width:100%;max-width:760px;margin:0 auto}
+
 @media (max-width:1000px){
   .grid{grid-template-columns:60px 220px minmax(0,1fr)}
   #notifCol{display:none}
   .grid.show-notifs #notifCol{display:flex;grid-column:2/4}
-  .grid.show-notifs #threadsCol,.grid.show-notifs #chatCol{display:none}
   #callsCol,#settingsCol{grid-column:2/4}
 }
