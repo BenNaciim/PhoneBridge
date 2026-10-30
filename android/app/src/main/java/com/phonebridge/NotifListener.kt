@@ -80,7 +80,10 @@ class NotifListener : NotificationListenerService() {
         val n = sbn.notification
         val ex = n.extras
         val template = ex.getString(Notification.EXTRA_TEMPLATE) ?: ""
-        if (n.category != Notification.CATEGORY_MESSAGE && !template.endsWith("MessagingStyle")) return null
+        // Messagerie : style « conversation », catégorie « message », ou toute notification qui propose une réponse
+        // (certaines versions de Messenger n'annoncent ni l'un ni l'autre). Les appels n'en font pas partie.
+        val isMessage = n.category == Notification.CATEGORY_MESSAGE || template.endsWith("MessagingStyle") || replyAction(n) != null
+        if (!isMessage || n.category == Notification.CATEGORY_CALL) return null
         val convTitle = ex.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
         val group = ex.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false) || convTitle.isNotEmpty()
         val name = convTitle.ifEmpty { title }
