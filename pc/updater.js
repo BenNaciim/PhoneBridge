@@ -75,10 +75,24 @@ async function downloadUpdate(info, dir, { onProgress, fetchImpl = fetch, allowH
   try {
     await pipeline(body, fs.createWriteStream(part));
     if (hash.digest('hex') !== info.sha256) throw new Error('Somme de contrôle incorrecte : fichier rejeté');
-    return await moveInto(part, file);
+    const moved = await moveInto(part, file);
+    await verifyFile(moved, info.sha256);
+    return moved;
   } catch (err) {
     fs.rmSync(part, { force: true });
     throw err;
+  }
+}
+
+/** Relit le fichier sur le disque et compare sa somme SHA-256 : ce qu'on lance doit être ce que GitHub a publié. */
+async function verifyFile(file, sha256) {
+  const hash = crypto.createHash('sha256');
+  await pipeline(fs.createReadStream(file), async function* (source) {
+    for await (const chunk of source) hash.update(chunk);
+  });
+  if (hash.digest('hex') !== sha256) {
+    fs.rmSync(file, { force: true });
+    throw new Error('Le fichier téléchargé a été modifié sur le disque (antivirus ?) : il est supprimé, réessayez.');
   }
 }
 
@@ -109,11 +123,16 @@ async function moveInto(part, file, { tries = 20, delayMs = 500 } = {}) {
  * élévation ou qu'un antivirus tient encore le fichier : on réessaie, puis on passe par « start »
  * (ShellExecute), qui sait demander l'élévation.
  */
-function launchInstaller(file, args, { spawnImpl = require('node:child_process').spawn, retries = 3, delayMs = 1000 } = {}) {
+function launchInstaller(file, args, { spawnImpl = require('node:child_process').spawn, retries = 3, delayMs = 1000, watchMs = 2500 } = {}) {
   const attempt = (cmd, cmdArgs) => new Promise((resolve, reject) => {
     const child = spawnImpl(cmd, cmdArgs, { detached: true, stdio: 'ignore', windowsHide: true });
     child.once('error', reject);
-    child.once('spawn', () => { child.unref(); resolve(); });
+    // Un installateur sain tourne plusieurs secondes : une sortie immédiate en erreur est un échec.
+    child.once('spawn', () => {
+      const early = (code) => reject(Object.assign(new Error(`L'installateur s'est arrêté (code ${code})`), { code: 'EARLYEXIT' }));
+      child.once('exit', (code) => { if (code) early(code); });
+      setTimeout(() => { child.removeAllListeners('exit'); child.unref(); resolve(); }, watchMs);
+    });
   });
   return (async () => {
     let last;
@@ -124,10 +143,11 @@ function launchInstaller(file, args, { spawnImpl = require('node:child_process')
         await new Promise((r) => setTimeout(r, delayMs));
       }
     }
+    if (last && last.code === 'EARLYEXIT') throw last;
     try { return await attempt('cmd.exe', ['/c', 'start', '""', file, ...args]); } catch (err) {
       throw new Error(`Impossible de lancer l'installateur (${last ? last.code || last.message : err.message}). Fichier : ${file}`);
     }
   })();
 }
 
-module.exports = { checkForUpdate, downloadUpdate, launchInstaller, moveInto, compareVersions, REPO };
+module.exports = { checkForUpdate, downloadUpdate, launchInstaller, moveInto, verifyFile, compareVersions, REPO };

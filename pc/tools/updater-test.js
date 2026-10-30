@@ -48,7 +48,7 @@ const { checkForUpdate, downloadUpdate, compareVersions } = require('../updater'
     });
     return ev;
   };
-  await launchInstaller('C:\\x\\setup.exe', ['/S'], { spawnImpl: fakeSpawn, retries: 2, delayMs: 1 });
+  await launchInstaller('C:\\x\\setup.exe', ['/S'], { spawnImpl: fakeSpawn, retries: 2, delayMs: 1, watchMs: 1 });
   assert.deepStrictEqual(calls, ['C:\\x\\setup.exe', 'C:\\x\\setup.exe', 'cmd.exe']);
   // Renommage : l'ancien fichier du même nom est remplacé, et EPERM persistant → copie sous un autre nom.
   const { moveInto } = require('../updater');
@@ -63,6 +63,21 @@ const { checkForUpdate, downloadUpdate, compareVersions } = require('../updater'
   fs.renameSync = realRename;
   assert.notStrictEqual(alt, b);
   assert.strictEqual(fs.readFileSync(alt, 'utf8'), 'v3');
+  // Fichier modifié sur le disque après coup : rejeté et supprimé. Installateur qui s'arrête aussitôt : erreur.
+  const { verifyFile } = require('../updater');
+  const g = path.join(dir, 'g.exe');
+  fs.writeFileSync(g, payload);
+  await verifyFile(g, sha);
+  fs.writeFileSync(g, Buffer.concat([payload, Buffer.from('x')]));
+  await assert.rejects(verifyFile(g, sha), /modifié sur le disque/);
+  assert.ok(!fs.existsSync(g));
+  const dying = () => {
+    const ev = new (require('node:events'))();
+    ev.unref = () => {};
+    setImmediate(() => { ev.emit('spawn'); ev.emit('exit', 1); });
+    return ev;
+  };
+  await assert.rejects(launchInstaller('x.exe', [], { spawnImpl: dying, retries: 1, delayMs: 1, watchMs: 50 }), /s'est arrêté/);
   srv.close();
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('updater : OK');
