@@ -23,7 +23,7 @@ Pas de compte Microsoft, pas de cloud, pas de serveur externe : le téléphone e
 
 ## Fonctions
 
-- **Messages** : lecture et envoi de SMS, réception des photos (MMS), réponse depuis le PC.
+- **Messages** : lecture et envoi de SMS, réception et envoi de photos (MMS, bouton trombone), réponse depuis le PC.
 - **Messageries** : les conversations WhatsApp, Messenger, Telegram… apparaissent dans la liste des messages, avec SMS, regroupées par contact, pastille de l'application et filtres. Réponse depuis le PC via la notification.
 - **Notifications** : toutes celles du téléphone, avec l'icône de l'application, réponse directe quand l'application la propose.
 - **Effacer d'un geste** : glissez deux doigts sur le pavé tactile pour effacer une notification, ici et sur le téléphone.
@@ -71,7 +71,7 @@ Pas de compte Microsoft, pas de cloud, pas de serveur externe : le téléphone e
 ## Limites connues
 
 - Les SMS envoyés depuis le PC partent bien, mais Android ne les range dans « Envoyés » que si PhoneBridge est l'application SMS par défaut.
-- Réception des MMS seulement (pas d'envoi). Appels : affichage seul, pas de rappel depuis le PC.
+- MMS : une photo à la fois, réduite à ≈ 300 Ko ; l'envoi demande les données mobiles et des réglages MMS valides chez l'opérateur. Pas d'envoi de photos par WhatsApp, Messenger… Appels : affichage seul, pas de rappel depuis le PC.
 - Messageries : seuls les messages passés par une notification sont visibles (pas d'historique plus ancien ni de photos), conservés en mémoire tant que l'application est ouverte. On ne peut répondre que tant que la notification existe sur le téléphone.
 - Le téléphone et le PC doivent être sur le même réseau local.
 - Certains téléphones coupent les applications en arrière-plan : activez « Rester actif en arrière-plan » dans l'application.
@@ -123,7 +123,7 @@ No Microsoft account, no cloud, no external server: the phone and the PC talk di
 
 ## Features
 
-- **Messages**: read and send SMS, receive photos (MMS), reply from the PC.
+- **Messages**: read and send SMS, receive and send photos (MMS, paperclip button), reply from the PC.
 - **Messaging apps**: WhatsApp, Messenger, Telegram… conversations show up in the message list next to SMS, grouped per contact, with an app badge and filters. Reply from the PC through the notification.
 - **Notifications**: everything your phone shows, with the app's icon, and direct replies when the app supports them.
 - **Swipe to dismiss**: swipe two fingers on the touchpad to clear a notification, on the PC and on the phone.
@@ -171,7 +171,7 @@ No Microsoft account, no cloud, no external server: the phone and the PC talk di
 ## Known limitations
 
 - SMS sent from the PC are delivered, but Android only files them under "Sent" if PhoneBridge is the default SMS app.
-- MMS are receive-only (no sending). Calls are display-only, with no call-back from the PC.
+- MMS: one photo at a time, shrunk to about 300 KB; sending needs mobile data and valid carrier MMS settings. No photo sending through WhatsApp, Messenger… Calls are display-only, with no call-back from the PC.
 - Messaging apps: only messages that came through a notification are visible (no older history, no photos), kept in memory while the app is open. You can reply only while the notification still exists on the phone.
 - The phone and the PC must be on the same local network.
 - Some phones kill background apps: turn on "Stay active in the background" in the app.

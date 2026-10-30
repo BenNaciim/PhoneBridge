@@ -76,6 +76,11 @@ ws.on('message', (raw) => {
       ]
     });
   }
+  if (m.t === 'send_mms') {
+    const bytes = Buffer.from(m.data || '', 'base64');
+    console.log(`MMS reçu : ${bytes.length} octets, ${m.mime}, jpeg=${bytes[0] === 0xff && bytes[1] === 0xd8}, vers ${m.to}`);
+    setTimeout(() => send({ t: 'mms_result', threadId: m.threadId, ok: true }), 600);
+  }
   if (m.t === 'get_threads') send({ t: 'sms_list', threads });
   if (m.t === 'get_thread') send({ t: 'sms_thread', threadId: m.threadId, messages: threadMsgs[m.threadId] || [] });
 });

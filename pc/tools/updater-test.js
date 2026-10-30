@@ -35,6 +35,21 @@ const { checkForUpdate, downloadUpdate, compareVersions } = require('../updater'
   await assert.rejects(downloadUpdate({ ...info, sha256: '0'.repeat(64) }, dir), /Somme de contrôle incorrecte/);
   assert.ok(!fs.existsSync(file + '.part'));
   await assert.rejects(downloadUpdate({ ...info, sha256: null }, dir), /absente/);
+  // Lancement : échec direct « UNKNOWN » puis repli par cmd /c start.
+  const { launchInstaller } = require('../updater');
+  const calls = [];
+  const fakeSpawn = (cmd, a) => {
+    calls.push(cmd);
+    const ev = new (require('node:events'))();
+    ev.unref = () => {};
+    setImmediate(() => {
+      if (cmd === 'cmd.exe') ev.emit('spawn');
+      else ev.emit('error', Object.assign(new Error('spawn UNKNOWN'), { code: 'UNKNOWN' }));
+    });
+    return ev;
+  };
+  await launchInstaller('C:\\x\\setup.exe', ['/S'], { spawnImpl: fakeSpawn, retries: 2, delayMs: 1 });
+  assert.deepStrictEqual(calls, ['C:\\x\\setup.exe', 'C:\\x\\setup.exe', 'cmd.exe']);
   srv.close();
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('updater : OK');

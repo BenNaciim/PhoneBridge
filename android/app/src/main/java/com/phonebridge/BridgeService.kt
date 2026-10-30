@@ -292,6 +292,7 @@ class BridgeService : Service() {
                 )
             }
             "send_sms" -> sendSms(m.optString("to"), m.optString("body"))
+            "send_mms" -> sendMms(m)
             "reply_notif" -> NotifListener.instance?.reply(m.optString("key"), m.optString("text"))
             "dismiss_notif" -> NotifListener.instance?.dismiss(m.optString("key"))
         }
@@ -333,6 +334,28 @@ class BridgeService : Service() {
             sms.sendMultipartTextMessage(to, null, sms.divideMessage(body), null, null)
         } catch (_: Exception) {
         }
+    }
+
+    private fun sendMms(m: JSONObject) {
+        val to = m.optString("to")
+        val threadId = m.optLong("threadId")
+        val report = { ok: Boolean, error: String? ->
+            val r = JSONObject().put("t", "mms_result").put("threadId", threadId).put("ok", ok)
+            if (error != null) r.put("error", error)
+            Relay.send(r)
+        }
+        Thread {
+            try {
+                val image = android.util.Base64.decode(m.optString("data"), android.util.Base64.DEFAULT)
+                if (to.isBlank() || image.isEmpty() || image.size > 1_000_000) {
+                    report(false, "Photo invalide ou trop lourde")
+                } else {
+                    MmsSender.send(this, to, m.optString("body"), image, m.optString("mime", "image/jpeg"), report)
+                }
+            } catch (e: Exception) {
+                report(false, e.message ?: "Envoi impossible")
+            }
+        }.start()
     }
 
     private fun sendBattery(i: Intent) {

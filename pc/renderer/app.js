@@ -151,6 +151,8 @@ function renderMsgs() {
   input.disabled = !canReply;
   $('sendBtn').disabled = !canReply;
   input.placeholder = canReply ? 'Écrire un message' : 'Réponse impossible : notification fermée sur le téléphone';
+  $('attachBtn').disabled = !t || appThread;
+  $('attachBtn').title = appThread ? 'Photos : disponible pour les SMS/MMS seulement' : 'Joindre une photo';
   $('via').textContent = appThread && canReply ? `Votre réponse sera envoyée depuis ${t.app} sur le téléphone.` : '';
   $('via').classList.toggle('hidden', !($('via').textContent));
 
@@ -172,6 +174,7 @@ function renderMsgs() {
 }
 
 function openThread(id) {
+  if (state.cur !== id) clearAttach();
   state.cur = id;
   const t = state.threads.find((x) => x.id === id);
   if (t) t.unread = 0;
@@ -390,11 +393,11 @@ function addIncoming(m) {
   if (m.threadId === state.cur) renderMsgs();
 }
 
-function addOutgoing(threadId, body) {
+function addOutgoing(threadId, body, images) {
   const t = state.threads.find((x) => x.id === threadId);
   if (!t) return;
-  (state.msgs[threadId] || (state.msgs[threadId] = [])).push({ body, date: Date.now(), out: true });
-  t.snippet = body;
+  (state.msgs[threadId] || (state.msgs[threadId] = [])).push({ body, date: Date.now(), out: true, images });
+  t.snippet = body || 'Photo';
   t.date = Date.now();
   state.threads.sort((a, b) => b.date - a.date);
   if (threadId === state.cur) renderMsgs();
@@ -416,6 +419,9 @@ function onPhone(m) {
       break;
     case 'sms_new':
       addIncoming(m);
+      break;
+    case 'mms_result':
+      flash(m.ok ? 'Photo envoyée par MMS.' : 'Photo non envoyée : ' + (m.error || 'erreur inconnue'));
       break;
     case 'notif':
       // Une notification de messagerie alimente sa conversation au lieu de la liste des notifications.
@@ -492,7 +498,16 @@ async function init() {
     const input = $('composeInput');
     const body = input.value.trim();
     const t = state.threads.find((x) => x.id === state.cur);
-    if (!body || !t) return;
+    if ((!body && !state.attach) || !t) return;
+    if (state.attach && !isApp(t)) {
+      const a = state.attach;
+      window.bridge.send({ t: 'send_mms', to: t.address, threadId: t.id, body, mime: 'image/jpeg', data: a.base64 });
+      addOutgoing(t.id, body, [a.dataUrl]);
+      clearAttach();
+      input.value = '';
+      return;
+    }
+    if (!body) return;
     if (isApp(t)) {
       if (!t.canReply) return;
       window.bridge.send({ t: 'reply_notif', key: t.replyKey, text: body });
@@ -525,12 +540,79 @@ async function init() {
 
   $('autoUpdate').addEventListener('change', (e) => window.bridge.setSettings({ autoUpdate: e.target.checked }));
   initUpdates();
+  initAttach();
 
   renderThreads();
   renderMsgs();
   renderNotifs();
   renderCalls();
   renderState();
+}
+
+/* Photos à envoyer (MMS) : réduites pour passer chez les opérateurs (≈ 300 Ko) */
+const MMS_MAX_BYTES = 280 * 1024;
+
+function clearAttach() {
+  state.attach = null;
+  $('attached').classList.add('hidden');
+  $('fileInput').value = '';
+}
+
+function compressImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = () => reject(new Error('Image illisible'));
+    img.onload = () => {
+      let side = Math.min(1600, Math.max(img.naturalWidth, img.naturalHeight));
+      for (let round = 0; round < 6; round++) {
+        const k = side / Math.max(img.naturalWidth, img.naturalHeight, 1);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.naturalWidth * Math.min(1, k)));
+        c.height = Math.max(1, Math.round(img.naturalHeight * Math.min(1, k)));
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff';
+        g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        for (const q of [0.85, 0.72, 0.6, 0.48]) {
+          const out = c.toDataURL('image/jpeg', q);
+          const base64 = out.slice(out.indexOf(',') + 1);
+          if (base64.length * 0.75 <= MMS_MAX_BYTES) return resolve({ dataUrl: out, base64, bytes: Math.round(base64.length * 0.75) });
+        }
+        side = Math.round(side * 0.75);
+      }
+      reject(new Error('Image trop lourde'));
+    };
+    img.src = dataUrl;
+  });
+}
+
+function initAttach() {
+  $('attachBtn').addEventListener('click', () => $('fileInput').click());
+  $('fileInput').addEventListener('change', () => {
+    const f = $('fileInput').files[0];
+    if (!f) return;
+    if (!/^image\//.test(f.type)) { flash('Seules les images sont acceptées.'); return; }
+    const r = new FileReader();
+    r.onload = async () => {
+      try {
+        state.attach = await compressImage(r.result);
+        $('attachedImg').src = state.attach.dataUrl;
+        $('attachedInfo').textContent = `${f.name} · ${Math.round(state.attach.bytes / 1024)} Ko`;
+        $('attached').classList.remove('hidden');
+        $('composeInput').focus();
+      } catch (err) { flash(err.message); }
+    };
+    r.readAsDataURL(f);
+  });
+  $('attachedX').addEventListener('click', clearAttach);
+}
+
+let flashTimer = 0;
+function flash(text) {
+  $('via').textContent = text;
+  $('via').classList.remove('hidden');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(renderMsgs, 6000);
 }
 
 /* Mises à jour */

@@ -83,4 +83,30 @@ async function downloadUpdate(info, dir, { onProgress, fetchImpl = fetch, allowH
   return file;
 }
 
-module.exports = { checkForUpdate, downloadUpdate, compareVersions, REPO };
+/**
+ * Lance l'installateur. Un lancement direct échoue avec « spawn UNKNOWN » quand Windows exige une
+ * élévation ou qu'un antivirus tient encore le fichier : on réessaie, puis on passe par « start »
+ * (ShellExecute), qui sait demander l'élévation.
+ */
+function launchInstaller(file, args, { spawnImpl = require('node:child_process').spawn, retries = 3, delayMs = 1000 } = {}) {
+  const attempt = (cmd, cmdArgs) => new Promise((resolve, reject) => {
+    const child = spawnImpl(cmd, cmdArgs, { detached: true, stdio: 'ignore', windowsHide: true });
+    child.once('error', reject);
+    child.once('spawn', () => { child.unref(); resolve(); });
+  });
+  return (async () => {
+    let last;
+    for (let i = 0; i < retries; i++) {
+      try { return await attempt(file, args); } catch (err) {
+        last = err;
+        if (err.code !== 'UNKNOWN' && err.code !== 'EBUSY' && err.code !== 'EPERM') break;
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+    try { return await attempt('cmd.exe', ['/c', 'start', '""', file, ...args]); } catch (err) {
+      throw new Error(`Impossible de lancer l'installateur (${last ? last.code || last.message : err.message}). Fichier : ${file}`);
+    }
+  })();
+}
+
+module.exports = { checkForUpdate, downloadUpdate, launchInstaller, compareVersions, REPO };

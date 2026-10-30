@@ -8,7 +8,6 @@ const { WebSocketServer } = require('ws');
 const QRCode = require('qrcode');
 const selfsigned = require('selfsigned');
 const { Bonjour } = require('bonjour-service');
-const { spawn } = require('child_process');
 const updater = require('./updater');
 
 const PORT = 8787;
@@ -352,7 +351,7 @@ ipcMain.handle('update:install', async () => {
     onProgress: (got, total) => toRendererSafe('update:progress', { got, total })
   });
   // L'installateur remplace l'application : la nôtre doit être fermée, il la relance ensuite.
-  spawn(file, ['/S', '--updated', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  await updater.launchInstaller(file, ['/S', '--updated', '--force-run']);
   quitting = true;
   app.quit();
   return undefined;

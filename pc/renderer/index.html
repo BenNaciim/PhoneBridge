@@ -93,7 +93,16 @@
     <div class="note hidden" id="appNote">Derniers messages reçus par notification. Pas d'historique plus ancien ni de photos.</div>
     <div class="msgs" id="msgs"></div>
     <div class="via hidden" id="via"></div>
+    <div class="attached hidden" id="attached">
+      <img id="attachedImg" alt="Photo jointe">
+      <span class="muted small" id="attachedInfo"></span>
+      <button type="button" class="link" id="attachedX">Retirer</button>
+    </div>
     <form class="compose" id="composeForm" autocomplete="off">
+      <button type="button" class="attach" id="attachBtn" aria-label="Joindre une photo" title="Joindre une photo">
+        <svg viewBox="0 0 24 24"><path d="M20 12.5 12.6 20a5 5 0 0 1-7.1-7.1l8-8a3.4 3.4 0 0 1 4.8 4.8l-8 8a1.8 1.8 0 0 1-2.5-2.5l7.3-7.3"/></svg>
+      </button>
+      <input type="file" id="fileInput" accept="image/*" hidden>
       <input id="composeInput" placeholder="Écrire un message" aria-label="Message">
       <button id="sendBtn" type="submit">Envoyer</button>
     </form>
