@@ -124,6 +124,13 @@ html[data-theme=light] .chip.on{color:#fff}
 .pairbox{display:flex;align-items:center;gap:16px}
 .pairbox img{background:#fff;border-radius:12px;padding:6px}
 
+.btn{border:1px solid var(--field-line);background:var(--chip);border-radius:12px;padding:6px 14px}
+.btn.primary{background:var(--mint);color:var(--mint-ink);border:0;font-weight:600}
+.btn:disabled{opacity:.6;cursor:default}
+.row2{display:flex;gap:8px;margin-top:6px}
+.updatebar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:16px}
+.updatebar .link{font-size:18px;text-decoration:none}
+
 @media (max-width:1000px){
   .grid{grid-template-columns:60px 220px minmax(0,1fr)}
   #notifCol{display:none}

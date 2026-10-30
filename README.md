@@ -31,6 +31,7 @@ Pas de compte Microsoft, pas de cloud, pas de serveur externe : le téléphone e
 - **Alertes sur le bureau** : une carte en bas de l'écran avec un champ de réponse rapide.
 - **Réglages** : thème clair, sombre ou automatique, transparence et flou du verre, choix des applications dont on veut les notifications, démarrage avec Windows.
 - **Reconnexion automatique** : retour du Wi-Fi, redémarrage du téléphone, changement d'adresse du PC.
+- **Mises à jour** : le PC détecte les nouvelles releases GitHub, vérifie la somme SHA-256 de l'installateur, puis s'installe et redémarre en un clic.
 - **Chiffré** : TLS avec épinglage du certificat, le code de jumelage fait foi.
 
 ## Installation
@@ -130,6 +131,7 @@ No Microsoft account, no cloud, no external server: the phone and the PC talk di
 - **Desktop alerts**: a card at the bottom of the screen with a quick-reply field.
 - **Settings**: light, dark or automatic theme, glass transparency and blur, per-app notification filter, start with Windows.
 - **Automatic reconnection**: Wi-Fi back, phone reboot, PC address change.
+- **Updates**: the PC detects new GitHub releases, checks the installer's SHA-256, then installs and restarts in one click.
 - **Encrypted**: TLS with certificate pinning, the pairing code is the source of trust.
 
 ## Installation

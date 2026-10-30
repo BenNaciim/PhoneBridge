@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, shell } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -8,6 +8,8 @@ const { WebSocketServer } = require('ws');
 const QRCode = require('qrcode');
 const selfsigned = require('selfsigned');
 const { Bonjour } = require('bonjour-service');
+const { spawn } = require('child_process');
+const updater = require('./updater');
 
 const PORT = 8787;
 const hiddenStart = process.argv.includes('--hidden');
@@ -25,7 +27,7 @@ let token = '';
 let certFp = '';
 let toasts = [];
 let icons = {};
-let settings = { theme: 'auto', glass: 0.14, blur: 22, toasts: true, autostart: true, muted: {}, apps: {} };
+let settings = { theme: 'auto', glass: 0.14, blur: 22, toasts: true, autostart: true, autoUpdate: true, muted: {}, apps: {} };
 
 const userFile = (name) => path.join(app.getPath('userData'), name);
 const iconPath = path.join(__dirname, 'renderer', 'icon.png');
@@ -321,8 +323,39 @@ ipcMain.on('settings:set', (_e, p) => {
   if (typeof p.blur === 'number') settings.blur = Math.min(40, Math.max(8, p.blur));
   if (typeof p.toasts === 'boolean') settings.toasts = p.toasts;
   if (typeof p.autostart === 'boolean') { settings.autostart = p.autostart; applyAutostart(); }
+  if (typeof p.autoUpdate === 'boolean') settings.autoUpdate = p.autoUpdate;
   if (typeof p.mutePkg === 'string') settings.muted[p.mutePkg] = !!p.muted;
   saveSettings();
+});
+
+/* Mises à jour : releases GitHub, installateur vérifié par sa somme SHA-256 */
+let pendingUpdate = null;
+const updateSummary = (i) => ({ version: i.version, page: i.page, canInstall: Boolean(i.sha256) });
+const toRendererSafe = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send(ch, data); };
+
+async function lookForUpdate() {
+  const info = await updater.checkForUpdate({ current: app.getVersion() });
+  pendingUpdate = info;
+  toRendererSafe('update:avail', info && updateSummary(info));
+  return info;
+}
+
+ipcMain.handle('update:check', async () => {
+  const info = await lookForUpdate();
+  return { current: app.getVersion(), update: info && updateSummary(info) };
+});
+ipcMain.handle('update:state', () => ({ current: app.getVersion(), update: pendingUpdate && updateSummary(pendingUpdate) }));
+ipcMain.handle('update:install', async () => {
+  if (!pendingUpdate) throw new Error('Aucune mise à jour à installer');
+  if (!pendingUpdate.sha256) return shell.openExternal(pendingUpdate.page);
+  const file = await updater.downloadUpdate(pendingUpdate, path.join(app.getPath('temp'), 'phonebridge-update'), {
+    onProgress: (got, total) => toRendererSafe('update:progress', { got, total })
+  });
+  // L'installateur remplace l'application : la nôtre doit être fermée, il la relance ensuite.
+  spawn(file, ['/S', '--updated', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  quitting = true;
+  app.quit();
+  return undefined;
 });
 
 app.on('second-instance', () => showMain());
@@ -337,5 +370,10 @@ app.whenReady().then(async () => {
   createWindow();
   createTray();
   applyAutostart();
+  if (app.isPackaged) {
+    const auto = () => { if (settings.autoUpdate) lookForUpdate().catch(() => {}); };
+    setTimeout(auto, 15000);
+    setInterval(auto, 6 * 3600 * 1000);
+  }
 });
 app.on('window-all-closed', () => {});

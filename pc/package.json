@@ -31,6 +31,7 @@
       "main.js",
       "preload.js",
       "toast-preload.js",
+      "updater.js",
       "renderer/**/*",
       "package.json"
     ],

@@ -11,5 +11,10 @@ contextBridge.exposeInMainWorld('bridge', {
   onMessage: (cb) => ipcRenderer.on('phone:msg', (_e, m) => cb(m)),
   onSettings: (cb) => ipcRenderer.on('settings:changed', (_e, s) => cb(s)),
   onOpen: (cb) => ipcRenderer.on('ui:open', (_e, o) => cb(o)),
-  onLocalSent: (cb) => ipcRenderer.on('local:sent', (_e, o) => cb(o))
+  onLocalSent: (cb) => ipcRenderer.on('local:sent', (_e, o) => cb(o)),
+  updateState: () => ipcRenderer.invoke('update:state'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateAvail: (cb) => ipcRenderer.on('update:avail', (_e, u) => cb(u)),
+  onUpdateProgress: (cb) => ipcRenderer.on('update:progress', (_e, p) => cb(p))
 });

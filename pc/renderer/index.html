@@ -20,6 +20,12 @@
   <p id="pairState" class="status">En attente du téléphone…</p>
 </main>
 
+<div class="glass updatebar hidden" id="updateBar">
+  <span id="updateText"></span>
+  <button type="button" class="btn primary" id="updateGo">Installer et redémarrer</button>
+  <button type="button" class="link" id="updateX" aria-label="Masquer">×</button>
+</div>
+
 <div id="app" class="grid hidden">
   <nav class="glass rail" aria-label="Sections">
     <button class="ri on" data-tab="messages" aria-label="Messages" title="Messages">
@@ -60,6 +66,11 @@
       <h2>Alertes et démarrage</h2>
       <label class="row"><span>Alertes sur le bureau (avec réponse rapide)</span><input type="checkbox" id="toasts"></label>
       <label class="row"><span>Lancer PhoneBridge au démarrage de Windows</span><input type="checkbox" id="autostart"></label>
+
+      <h2>Mises à jour</h2>
+      <label class="row"><span>Rechercher automatiquement les mises à jour</span><input type="checkbox" id="autoUpdate"></label>
+      <p class="muted small" id="updateStatus"></p>
+      <div class="row2"><button type="button" class="btn" id="checkUpdate">Rechercher maintenant</button><button type="button" class="btn primary hidden" id="installUpdate">Installer et redémarrer</button></div>
 
       <h2>Notifications par application</h2>
       <p class="muted small">Désactivez les applications dont vous ne voulez pas voir les notifications sur le PC. La liste se remplit au fil des notifications reçues.</p>

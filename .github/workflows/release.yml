@@ -38,7 +38,7 @@ jobs:
         working-directory: pc
         shell: bash
         run: |
-          for f in main.js preload.js toast-preload.js renderer/app.js renderer/toast.js; do
+          for f in main.js preload.js toast-preload.js updater.js renderer/app.js renderer/toast.js; do
             node --check "$f"
           done
 

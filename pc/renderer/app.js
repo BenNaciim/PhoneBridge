@@ -330,6 +330,7 @@ function renderSettings() {
   $('blurOut').textContent = s.blur + ' px';
   $('toasts').checked = !!s.toasts;
   $('autostart').checked = !!s.autostart;
+  $('autoUpdate').checked = s.autoUpdate !== false;
 
   const box = $('appList');
   box.replaceChildren();
@@ -522,11 +523,68 @@ async function init() {
   $('toasts').addEventListener('change', (e) => window.bridge.setSettings({ toasts: e.target.checked }));
   $('autostart').addEventListener('change', (e) => window.bridge.setSettings({ autostart: e.target.checked }));
 
+  $('autoUpdate').addEventListener('change', (e) => window.bridge.setSettings({ autoUpdate: e.target.checked }));
+  initUpdates();
+
   renderThreads();
   renderMsgs();
   renderNotifs();
   renderCalls();
   renderState();
+}
+
+/* Mises à jour */
+let updateDismissed = '';
+const errText = (err) => String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+
+function showUpdate(u) {
+  const label = u && u.canInstall ? 'Installer et redémarrer' : 'Voir la page de téléchargement';
+  $('installUpdate').classList.toggle('hidden', !u);
+  if (u) $('installUpdate').textContent = label;
+  if (!u || u.version === updateDismissed) { $('updateBar').classList.add('hidden'); return; }
+  $('updateText').textContent = `La version ${u.version} de PhoneBridge est disponible.`;
+  $('updateGo').textContent = label;
+  $('updateGo').disabled = false;
+  $('updateBar').dataset.version = u.version;
+  $('updateBar').classList.remove('hidden');
+}
+
+function initUpdates() {
+  window.bridge.updateState().then((r) => {
+    $('updateStatus').textContent = `Version installée : ${r.current}`;
+    showUpdate(r.update);
+  });
+  window.bridge.onUpdateAvail(showUpdate);
+  window.bridge.onUpdateProgress(({ got, total }) => {
+    $('updateGo').textContent = total ? `Téléchargement… ${Math.floor((got / total) * 100)} %` : 'Téléchargement…';
+  });
+  $('updateGo').addEventListener('click', async () => {
+    $('updateGo').disabled = true;
+    try {
+      await window.bridge.installUpdate();
+    } catch (err) {
+      $('updateText').textContent = errText(err);
+      $('updateGo').disabled = false;
+    }
+  });
+  $('updateX').addEventListener('click', () => {
+    updateDismissed = $('updateBar').dataset.version || '';
+    $('updateBar').classList.add('hidden');
+  });
+  $('installUpdate').addEventListener('click', () => $('updateGo').click());
+  $('checkUpdate').addEventListener('click', async () => {
+    $('updateStatus').textContent = 'Recherche en cours…';
+    try {
+      const r = await window.bridge.checkUpdate();
+      updateDismissed = '';
+      $('updateStatus').textContent = r.update
+        ? `Version ${r.update.version} disponible (installée : ${r.current}).`
+        : `Vous avez la dernière version (${r.current}).`;
+      showUpdate(r.update);
+    } catch (err) {
+      $('updateStatus').textContent = `Recherche impossible : ${errText(err)}`;
+    }
+  });
 }
 
 init();
