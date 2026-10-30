@@ -329,6 +329,11 @@ ipcMain.on('settings:set', (_e, p) => {
 
 /* Mises à jour : releases GitHub, installateur vérifié par sa somme SHA-256 */
 let pendingUpdate = null;
+let installing = false;
+/** Journal des mises à jour (dossier des données de l'app, update.log) : sert à comprendre un échec. */
+function updateLog(line) {
+  try { fs.appendFileSync(userFile('update.log'), `${new Date().toISOString()} ${line}\n`); } catch (_) { /* journal facultatif */ }
+}
 const updateSummary = (i) => ({ version: i.version, page: i.page, canInstall: Boolean(i.sha256) });
 const toRendererSafe = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send(ch, data); };
 
@@ -347,11 +352,19 @@ ipcMain.handle('update:state', () => ({ current: app.getVersion(), update: pendi
 ipcMain.handle('update:install', async () => {
   if (!pendingUpdate) throw new Error('Aucune mise à jour à installer');
   if (!pendingUpdate.sha256) return shell.openExternal(pendingUpdate.page);
-  const file = await updater.downloadUpdate(pendingUpdate, path.join(app.getPath('temp'), 'phonebridge-update'), {
-    onProgress: (got, total) => toRendererSafe('update:progress', { got, total })
-  });
+  if (installing) throw new Error('Une mise à jour est déjà en cours');
+  installing = true;
+  let file;
+  try {
+    file = await updater.downloadUpdate(pendingUpdate, path.join(app.getPath('temp'), 'phonebridge-update'), {
+      onProgress: (got, total) => toRendererSafe('update:progress', { got, total }),
+      log: updateLog
+    });
+  } finally { installing = false; }
   // L'installateur remplace l'application : la nôtre doit être fermée, il la relance ensuite.
+  updateLog(`lancement de ${file}`);
   await updater.launchInstaller(file, ['/S', '--updated', '--force-run']);
+  updateLog('installateur lancé, fermeture de l\'application');
   quitting = true;
   app.quit();
   return undefined;

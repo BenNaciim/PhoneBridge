@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { Readable } = require('node:stream');
+const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 
 const REPO = 'BenNaciim/PhoneBridge';
@@ -52,7 +52,7 @@ async function checkForUpdate({ current, repo = REPO, api = API, fetchImpl = fet
  * Downloads the installer and checks its SHA-256 against the one GitHub published for that file.
  * Without that checksum nothing is run: the caller can still send the user to the release page.
  */
-async function downloadUpdate(info, dir, { onProgress, fetchImpl = fetch, allowHost = /(^|\.)(github\.com|githubusercontent\.com)$/i } = {}) {
+async function downloadUpdate(info, dir, { onProgress, log = () => {}, fetchImpl = fetch, allowHost = /(^|\.)(github\.com|githubusercontent\.com)$/i } = {}) {
   const u = new URL(info.url);
   if (u.protocol !== 'https:' && u.hostname !== '127.0.0.1') throw new Error('Adresse de mise à jour refusée');
   if (u.hostname !== '127.0.0.1' && !allowHost.test(u.hostname)) throw new Error('Adresse de mise à jour refusée');
@@ -66,31 +66,47 @@ async function downloadUpdate(info, dir, { onProgress, fetchImpl = fetch, allowH
   const total = Number(res.headers.get('content-length')) || info.size || 0;
   const hash = crypto.createHash('sha256');
   let got = 0;
-  const body = Readable.fromWeb(res.body);
-  body.on('data', (chunk) => {
-    hash.update(chunk);
-    got += chunk.length;
-    if (onProgress) onProgress(got, total);
+  // Un seul consommateur : le flux passe par un Transform qui copie chaque bloc avant de le hacher et de
+  // l'écrire. (Avec un écouteur « data » en plus du pipe, le fichier écrit différait du flux haché dans
+  // l'application Electron dès que le rappel de progression était un peu lent.)
+  let lastReport = 0;
+  const counter = new Transform({
+    transform(chunk, _enc, cb) {
+      const copy = Buffer.from(chunk);
+      hash.update(copy);
+      got += copy.length;
+      const now = Date.now();
+      if (onProgress && (now - lastReport > 200 || got === total)) { lastReport = now; onProgress(got, total); }
+      cb(null, copy);
+    }
   });
+  log(`téléchargement ${info.version} : ${total} octets attendus`);
   try {
-    await pipeline(body, fs.createWriteStream(part));
-    if (hash.digest('hex') !== info.sha256) throw new Error('Somme de contrôle incorrecte : fichier rejeté');
+    await pipeline(Readable.fromWeb(res.body), counter, fs.createWriteStream(part));
+    const streamHash = hash.digest('hex');
+    log(`reçu ${got} octets, écrit ${fs.statSync(part).size} octets, sha256 du flux ${streamHash}`);
+    if (streamHash !== info.sha256) throw new Error('Somme de contrôle incorrecte : fichier rejeté');
     const moved = await moveInto(part, file);
-    await verifyFile(moved, info.sha256);
+    log(`déplacé vers ${moved}`);
+    await verifyFile(moved, info.sha256, log);
+    log('fichier vérifié sur le disque');
     return moved;
   } catch (err) {
+    log(`échec : ${err.message}`);
     fs.rmSync(part, { force: true });
     throw err;
   }
 }
 
 /** Relit le fichier sur le disque et compare sa somme SHA-256 : ce qu'on lance doit être ce que GitHub a publié. */
-async function verifyFile(file, sha256) {
+async function verifyFile(file, sha256, log = () => {}) {
   const hash = crypto.createHash('sha256');
   await pipeline(fs.createReadStream(file), async function* (source) {
     for await (const chunk of source) hash.update(chunk);
   });
-  if (hash.digest('hex') !== sha256) {
+  const actual = hash.digest('hex');
+  log(`sha256 sur le disque ${actual} (${fs.statSync(file).size} octets)`);
+  if (actual !== sha256) {
     fs.rmSync(file, { force: true });
     throw new Error('Le fichier téléchargé a été modifié sur le disque (antivirus ?) : il est supprimé, réessayez.');
   }
