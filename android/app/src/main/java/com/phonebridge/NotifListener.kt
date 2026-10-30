@@ -1,15 +1,18 @@
 package com.phonebridge
 
 import android.app.Notification
+import android.app.Person
 import android.app.RemoteInput
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Bundle
+import android.provider.Telephony
 import android.util.Base64
 import java.io.ByteArrayOutputStream
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import org.json.JSONArray
 import org.json.JSONObject
 
 class NotifListener : NotificationListenerService() {
@@ -54,18 +57,57 @@ class NotifListener : NotificationListenerService() {
         } catch (_: Exception) {
             sbn.packageName
         }
-        Relay.send(
-            JSONObject()
-                .put("t", "notif")
-                .put("key", sbn.key)
-                .put("app", label)
-                .put("pkg", sbn.packageName)
-                .put("icon", iconOf(sbn.packageName))
-                .put("title", title)
-                .put("text", text)
-                .put("time", sbn.postTime)
-                .put("canReply", replyAction(n) != null)
-        )
+        val o = JSONObject()
+            .put("t", "notif")
+            .put("key", sbn.key)
+            .put("app", label)
+            .put("pkg", sbn.packageName)
+            .put("icon", iconOf(sbn.packageName))
+            .put("title", title)
+            .put("text", text)
+            .put("time", sbn.postTime)
+            .put("canReply", replyAction(n) != null)
+        // Les SMS ont déjà leur propre liste : seules les messageries (Messenger, WhatsApp…) deviennent des conversations.
+        if (sbn.packageName != Telephony.Sms.getDefaultSmsPackage(this)) {
+            conversation(sbn, title, text)?.let { o.put("conv", it) }
+        }
+        Relay.send(o)
+    }
+
+    /** Conversation d'une notification de messagerie (MessagingStyle) : nom, groupe et derniers messages. */
+    @Suppress("DEPRECATION")
+    private fun conversation(sbn: StatusBarNotification, title: String, text: String): JSONObject? {
+        val n = sbn.notification
+        val ex = n.extras
+        val template = ex.getString(Notification.EXTRA_TEMPLATE) ?: ""
+        if (n.category != Notification.CATEGORY_MESSAGE && !template.endsWith("MessagingStyle")) return null
+        val convTitle = ex.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
+        val group = ex.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false) || convTitle.isNotEmpty()
+        val name = convTitle.ifEmpty { title }
+        if (name.isEmpty()) return null
+
+        val me = ex.get(Notification.EXTRA_MESSAGING_PERSON) as? Person
+        val myName = me?.name?.toString()
+        val msgs = JSONArray()
+        for (key in arrayOf(Notification.EXTRA_HISTORIC_MESSAGES, Notification.EXTRA_MESSAGES)) {
+            val arr = ex.getParcelableArray(key) ?: continue
+            for (p in arr) {
+                val b = p as? Bundle ?: continue
+                val t = b.getCharSequence("text")?.toString() ?: continue
+                val person = b.get("sender_person") as? Person
+                val sender = person?.name?.toString() ?: b.getCharSequence("sender")?.toString() ?: ""
+                val mine = (me != null && person != null && person.key != null && person.key == me.key) ||
+                    (myName != null && sender.isNotEmpty() && sender == myName)
+                msgs.put(
+                    JSONObject().put("text", t).put("time", b.getLong("time", sbn.postTime))
+                        .put("sender", sender).put("out", mine)
+                )
+            }
+        }
+        if (msgs.length() == 0 && text.isNotEmpty()) {
+            msgs.put(JSONObject().put("text", text).put("time", sbn.postTime).put("sender", title).put("out", false))
+        }
+        return JSONObject().put("id", "${sbn.packageName}|$name").put("name", name).put("group", group).put("messages", msgs)
     }
 
     private val iconCache = HashMap<String, String>()

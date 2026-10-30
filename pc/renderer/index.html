@@ -73,12 +73,15 @@
 
   <section class="glass col" id="threadsCol">
     <header>Messages</header>
+    <div class="chips hidden" id="threadChips"></div>
     <div class="scroll" id="threads"></div>
   </section>
 
   <section class="glass col" id="chatCol">
     <header id="chatTitle">Sélectionnez une conversation</header>
+    <div class="note hidden" id="appNote">Derniers messages reçus par notification. Pas d'historique plus ancien ni de photos.</div>
     <div class="msgs" id="msgs"></div>
+    <div class="via hidden" id="via"></div>
     <form class="compose" id="composeForm" autocomplete="off">
       <input id="composeInput" placeholder="Écrire un message" aria-label="Message">
       <button id="sendBtn" type="submit">Envoyer</button>

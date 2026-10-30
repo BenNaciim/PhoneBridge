@@ -1,6 +1,6 @@
 {
   "name": "phonebridge-pc",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Notifications et messages de votre téléphone Android sur le PC",
   "author": "PhoneBridge",
   "main": "main.js",
@@ -23,9 +23,28 @@
   "build": {
     "appId": "com.phonebridge.pc",
     "productName": "PhoneBridge",
-    "directories": { "output": "dist", "buildResources": "assets" },
-    "files": ["main.js", "preload.js", "toast-preload.js", "renderer/**/*", "package.json"],
-    "win": { "target": "nsis", "icon": "assets/icon.png", "signExecutable": false },
-    "nsis": { "artifactName": "PhoneBridge-Setup-${version}.${ext}", "oneClick": true, "perMachine": false, "deleteAppDataOnUninstall": false, "shortcutName": "PhoneBridge" }
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "toast-preload.js",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png",
+      "signExecutable": false
+    },
+    "nsis": {
+      "artifactName": "PhoneBridge-Setup-${version}.${ext}",
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "PhoneBridge"
+    }
   }
 }

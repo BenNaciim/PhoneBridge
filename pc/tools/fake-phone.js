@@ -40,7 +40,28 @@ ws.on('message', (raw) => {
   console.log('<-', m);
   if (m.t === 'welcome') {
     send({ t: 'battery', pct: 78 });
-    send({ t: 'notif', key: 'n1', app: 'WhatsApp', pkg: 'com.whatsapp', icon, title: 'Sarah', text: 'On se retrouve à quelle heure ?', time: now - 60000, canReply: true });
+    send({
+      t: 'notif', key: 'n1', app: 'WhatsApp', pkg: 'com.whatsapp', icon, title: 'Sarah', text: 'On se retrouve à quelle heure ?', time: now - 60000, canReply: true,
+      conv: {
+        id: 'com.whatsapp|Sarah', name: 'Sarah', group: false,
+        messages: [
+          { text: 'Salut ! Tu es dispo ce soir ?', time: now - 300000, sender: 'Sarah', out: false },
+          { text: 'Oui, vers 19h', time: now - 240000, sender: 'Moi', out: true },
+          { text: 'On se retrouve à quelle heure ?', time: now - 60000, sender: 'Sarah', out: false }
+        ]
+      }
+    });
+    send({
+      t: 'notif', key: 'n4', app: 'Messenger', pkg: 'com.facebook.orca', icon, title: 'Groupe Famille', text: 'Léa: Je m\'en occupe', time: now - 30000, canReply: true,
+      conv: {
+        id: 'com.facebook.orca|Groupe Famille', name: 'Groupe Famille', group: true,
+        messages: [
+          { text: 'Qui apporte le dessert ?', time: now - 90000, sender: 'Maman', out: false },
+          { text: 'Moi je prends les boissons', time: now - 60000, sender: 'Karim', out: false },
+          { text: 'Je m\'en occupe', time: now - 30000, sender: 'Léa', out: false }
+        ]
+      }
+    });
     send({ t: 'notif', key: 'n2', app: 'Banque', pkg: 'bank', title: 'Paiement carte', text: 'Débit de 24,90 € chez Carrefour', time: now - 3000000, canReply: false });
     send({ t: 'notif', key: 'n3', app: 'Jeu', pkg: 'game.arcade', title: 'Vos vies sont rechargées', text: 'Revenez jouer !', time: now - 1000000, canReply: false });
     setTimeout(() => send({ t: 'sms_new', id: 14, threadId: 1, address: '+33612345678', name: 'Sarah', body: 'Je réserve pour 19h30 ?', date: Date.now() }), 8000);

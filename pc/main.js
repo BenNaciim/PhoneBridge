@@ -135,9 +135,11 @@ function onPhoneMessage(m) {
     if (note.pkg && settings.muted[note.pkg]) return;
     toRenderer('phone:msg', note);
     if (settings.toasts && !windowIsActive()) {
+      const conv = note.conv;
       showToast({
-        title: note.app, subtitle: note.title, body: note.text, icon: icons[note.pkg],
-        reply: note.canReply ? { kind: 'notif', key: note.key } : null
+        title: conv ? conv.name : note.app, subtitle: conv ? note.app : note.title, body: note.text,
+        icon: icons[note.pkg], threadId: conv ? conv.id : undefined,
+        reply: note.canReply ? { kind: 'notif', key: note.key, convId: conv ? conv.id : undefined } : null
       });
     }
     return;
@@ -303,6 +305,7 @@ ipcMain.on('toast:reply', (e, text) => {
     toRenderer('local:sent', { threadId: r.threadId, body });
   } else if (r.kind === 'notif') {
     sendPhone({ t: 'reply_notif', key: r.key, text: body });
+    if (r.convId) toRenderer('local:sent', { threadId: r.convId, body });
   }
   w.close();
 });

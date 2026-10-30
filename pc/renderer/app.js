@@ -2,7 +2,7 @@ const PALETTE = [['#CECBF6', '#3C3489'], ['#F5C4B3', '#712B13'], ['#9FE1CB', '#0
 const KIND = { missed: 'Appel en absence', in: 'Appel reçu', out: 'Appel émis', rejected: 'Appel refusé', voicemail: 'Message vocal' };
 
 const state = {
-  icons: {}, threads: [], msgs: {}, notifs: [], calls: [], seenCallId: 0, cur: null,
+  icons: {}, threads: [], msgs: {}, notifs: [], calls: [], seenCallId: 0, cur: null, filter: 'all',
   connected: false, device: '', battery: null,
   settings: { theme: 'auto', glass: 0.14, blur: 22, toasts: true, autostart: true, muted: {}, apps: {} }
 };
@@ -71,16 +71,64 @@ function applyAppearance() {
   root.style.setProperty('--glass-blur', s.blur + 'px');
 }
 
-/* Messages */
+/* Messages : SMS et conversations des messageries (Messenger, WhatsApp…) dans la même liste */
+const isApp = (t) => t.kind === 'app';
+const threadVisible = (t) => !(isApp(t) && state.settings.muted[t.pkg]);
+
+/** Pastille d'application posée sur l'avatar d'une conversation de messagerie. */
+function avatarWithApp(t) {
+  const wrap = el('div', 'avw');
+  wrap.append(avatar(t.name || t.address));
+  if (isApp(t)) {
+    const badge = el('div', 'appbadge');
+    const src = state.icons[t.pkg];
+    if (src) {
+      const img = el('img');
+      img.alt = '';
+      img.src = src;
+      badge.append(img);
+    } else {
+      badge.textContent = (t.app || '?')[0].toUpperCase();
+    }
+    wrap.append(badge);
+  }
+  return wrap;
+}
+
+function renderFilters() {
+  const box = $('threadChips');
+  box.replaceChildren();
+  const sources = [['all', 'Toutes']];
+  if (state.threads.some((t) => !isApp(t))) sources.push(['sms', 'SMS']);
+  const seen = new Set();
+  for (const t of state.threads) {
+    if (isApp(t) && threadVisible(t) && !seen.has(t.pkg)) {
+      seen.add(t.pkg);
+      sources.push([t.pkg, t.app]);
+    }
+  }
+  if (!sources.some(([k]) => k === state.filter)) state.filter = 'all';
+  for (const [key, label] of sources) {
+    const b = el('button', 'chip' + (key === state.filter ? ' on' : ''), label);
+    b.type = 'button';
+    b.addEventListener('click', () => { state.filter = key; renderThreads(); });
+    box.append(b);
+  }
+  box.classList.toggle('hidden', sources.length < 3);
+}
+
 function renderThreads() {
+  renderFilters();
   const box = $('threads');
   box.replaceChildren();
-  if (!state.threads.length) box.append(el('p', 'empty', 'Aucune conversation'));
-  for (const t of state.threads) {
+  const list = state.threads.filter((t) =>
+    threadVisible(t) && (state.filter === 'all' || (state.filter === 'sms' ? !isApp(t) : t.pkg === state.filter)));
+  if (!list.length) box.append(el('p', 'empty', 'Aucune conversation'));
+  for (const t of list) {
     const row = el('div', 'thread' + (t.id === state.cur ? ' on' : ''));
     const info = el('div', 'tinfo');
     info.append(el('div', 'tname', t.name || t.address), el('div', 'tsnip', t.snippet || ''));
-    row.append(avatar(t.name || t.address), info);
+    row.append(avatarWithApp(t), info);
     if (t.unread) row.append(el('span', 'badge', String(t.unread)));
     row.addEventListener('click', () => openThread(t.id));
     box.append(row);
@@ -91,9 +139,23 @@ function renderMsgs() {
   const box = $('msgs');
   box.replaceChildren();
   const t = state.threads.find((x) => x.id === state.cur);
-  $('chatTitle').textContent = t ? (t.name || t.address) : 'Sélectionnez une conversation';
+  $('chatTitle').replaceChildren();
+  $('chatTitle').append(el('span', null, t ? (t.name || t.address) : 'Sélectionnez une conversation'));
+  if (t && isApp(t)) $('chatTitle').append(appLabel(t.pkg, t.app));
   if (!t) box.append(el('p', 'empty', 'Choisissez une conversation à gauche'));
+
+  const appThread = !!t && isApp(t);
+  $('appNote').classList.toggle('hidden', !appThread);
+  const input = $('composeInput');
+  const canReply = !!t && (!appThread || t.canReply);
+  input.disabled = !canReply;
+  $('sendBtn').disabled = !canReply;
+  input.placeholder = canReply ? 'Écrire un message' : 'Réponse impossible : notification fermée sur le téléphone';
+  $('via').textContent = appThread && canReply ? `Votre réponse sera envoyée depuis ${t.app} sur le téléphone.` : '';
+  $('via').classList.toggle('hidden', !($('via').textContent));
+
   for (const m of state.msgs[state.cur] || []) {
+    if (appThread && t.group && !m.out && m.sender) box.append(el('div', 'who', m.sender));
     const b = el('div', 'm ' + (m.out ? 'out' : 'in'));
     for (const src of m.images || []) {
       const img = el('img');
@@ -116,7 +178,39 @@ function openThread(id) {
   showTab('messages');
   renderThreads();
   renderMsgs();
-  window.bridge.send({ t: 'get_thread', threadId: id });
+  if (t && !isApp(t)) window.bridge.send({ t: 'get_thread', threadId: id });
+}
+
+/** Fusionne les messages d'une notification de messagerie dans sa conversation (sans doublons). */
+function addConv(m) {
+  const c = m.conv;
+  let t = state.threads.find((x) => x.id === c.id);
+  if (!t) {
+    t = { id: c.id, kind: 'app', pkg: m.pkg, app: m.app, name: c.name, group: !!c.group, unread: 0, date: 0, seen: new Set() };
+    state.threads.push(t);
+    state.msgs[c.id] = [];
+  }
+  t.replyKey = m.key;
+  t.canReply = !!m.canReply;
+  const list = state.msgs[c.id];
+  for (const x of c.messages || []) {
+    const key = `${x.time}|${x.sender}|${x.text}`;
+    if (t.seen.has(key)) continue;
+    t.seen.add(key);
+    // Une réponse déjà envoyée depuis le PC revient dans la notification : on n'affiche pas la bulle en double.
+    if (x.out && list.some((o) => o.out && o.body === x.text && Math.abs(o.date - x.time) < 300000)) continue;
+    list.push({ body: x.text, date: x.time, out: !!x.out, sender: x.sender });
+    if (!x.out && c.id !== state.cur) t.unread = (t.unread || 0) + 1;
+  }
+  list.sort((a, b) => a.date - b.date);
+  const last = list[list.length - 1];
+  if (last) {
+    t.snippet = (t.group && !last.out && last.sender ? last.sender + ' : ' : '') + last.body;
+    t.date = last.date;
+  }
+  state.threads.sort((a, b) => (b.date || 0) - (a.date || 0));
+  renderThreads();
+  if (c.id === state.cur) renderMsgs();
 }
 
 /* Notifications */
@@ -259,6 +353,7 @@ function applySettings(s) {
   applyAppearance();
   renderSettings();
   renderNotifs();
+  renderThreads();
 }
 
 function renderState() {
@@ -283,7 +378,7 @@ function addIncoming(m) {
   list.push({ id: m.id, body: m.body, date: m.date, out: false, images: m.images });
   let t = state.threads.find((x) => x.id === m.threadId);
   if (!t) {
-    t = { id: m.threadId, address: m.address, name: m.name, unread: 0 };
+    t = { id: m.threadId, kind: 'sms', address: m.address, name: m.name, unread: 0 };
     state.threads.unshift(t);
   }
   t.snippet = m.body || (m.images && m.images.length ? 'Photo' : '');
@@ -308,7 +403,10 @@ function addOutgoing(threadId, body) {
 function onPhone(m) {
   switch (m.t) {
     case 'sms_list':
-      state.threads = m.threads || [];
+      state.threads = [
+        ...state.threads.filter(isApp),
+        ...(m.threads || []).map((t) => ({ ...t, kind: 'sms' }))
+      ].sort((a, b) => (b.date || 0) - (a.date || 0));
       renderThreads();
       break;
     case 'sms_thread':
@@ -319,15 +417,26 @@ function onPhone(m) {
       addIncoming(m);
       break;
     case 'notif':
+      // Une notification de messagerie alimente sa conversation au lieu de la liste des notifications.
+      if (m.conv) {
+        addConv(m);
+        break;
+      }
       state.notifs = state.notifs.filter((n) => n.key !== m.key);
       state.notifs.unshift(m);
       state.notifs = state.notifs.slice(0, 100);
       renderNotifs();
       break;
-    case 'notif_removed':
+    case 'notif_removed': {
       state.notifs = state.notifs.filter((n) => n.key !== m.key);
       renderNotifs();
+      let changed = false;
+      for (const t of state.threads) {
+        if (isApp(t) && t.replyKey === m.key && t.canReply) { t.canReply = false; changed = true; }
+      }
+      if (changed) renderMsgs();
       break;
+    }
     case 'calls':
       state.calls = m.calls || [];
       renderCalls();
@@ -346,6 +455,7 @@ async function init() {
     state.icons[o.pkg] = o.icon;
     renderNotifs();
     renderSettings();
+    renderThreads();
   });
   $('qr').src = info.qr;
   $('qr2').src = info.qr;
@@ -382,7 +492,12 @@ async function init() {
     const body = input.value.trim();
     const t = state.threads.find((x) => x.id === state.cur);
     if (!body || !t) return;
-    window.bridge.send({ t: 'send_sms', to: t.address, threadId: t.id, body });
+    if (isApp(t)) {
+      if (!t.canReply) return;
+      window.bridge.send({ t: 'reply_notif', key: t.replyKey, text: body });
+    } else {
+      window.bridge.send({ t: 'send_sms', to: t.address, threadId: t.id, body });
+    }
     addOutgoing(t.id, body);
     input.value = '';
   });
