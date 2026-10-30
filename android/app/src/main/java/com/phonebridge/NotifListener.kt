@@ -1,0 +1,111 @@
+package com.phonebridge
+
+import android.app.Notification
+import android.app.RemoteInput
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.os.Bundle
+import android.util.Base64
+import java.io.ByteArrayOutputStream
+import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
+import org.json.JSONObject
+
+class NotifListener : NotificationListenerService() {
+    companion object {
+        @Volatile var instance: NotifListener? = null
+    }
+
+    override fun onListenerConnected() {
+        instance = this
+    }
+
+    override fun onListenerDisconnected() {
+        instance = null
+    }
+
+    override fun onNotificationPosted(sbn: StatusBarNotification) = push(sbn)
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        Relay.send(JSONObject().put("t", "notif_removed").put("key", sbn.key))
+    }
+
+    fun pushAll() {
+        try {
+            activeNotifications?.forEach { push(it) }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun push(sbn: StatusBarNotification) {
+        val n = sbn.notification
+        if (sbn.packageName == packageName) return
+        if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        val extras = n.extras
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+        val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+            ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString() ?: ""
+        if (title.isEmpty() && text.isEmpty()) return
+
+        val label = try {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
+        } catch (_: Exception) {
+            sbn.packageName
+        }
+        Relay.send(
+            JSONObject()
+                .put("t", "notif")
+                .put("key", sbn.key)
+                .put("app", label)
+                .put("pkg", sbn.packageName)
+                .put("icon", iconOf(sbn.packageName))
+                .put("title", title)
+                .put("text", text)
+                .put("time", sbn.postTime)
+                .put("canReply", replyAction(n) != null)
+        )
+    }
+
+    private val iconCache = HashMap<String, String>()
+
+    /** Icône de l'application en PNG 64 px (base64), mise en cache : une seule conversion par application. */
+    private fun iconOf(pkg: String): String = iconCache.getOrPut(pkg) {
+        try {
+            val d = packageManager.getApplicationIcon(pkg)
+            val bmp = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+            d.setBounds(0, 0, 64, 64)
+            d.draw(Canvas(bmp))
+            val bos = ByteArrayOutputStream()
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, bos)
+            "data:image/png;base64," + Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun replyAction(n: Notification): Notification.Action? =
+        n.actions?.firstOrNull { a -> a.remoteInputs?.isNotEmpty() == true && a.actionIntent != null }
+
+    fun reply(key: String, text: String) {
+        val sbn = activeNotifications?.firstOrNull { it.key == key } ?: return
+        val action = replyAction(sbn.notification) ?: return
+        val inputs = action.remoteInputs ?: return
+        val results = Bundle()
+        inputs.forEach { results.putCharSequence(it.resultKey, text) }
+        val intent = Intent()
+        RemoteInput.addResultsToIntent(inputs, intent, results)
+        try {
+            action.actionIntent.send(this, 0, intent)
+        } catch (_: Exception) {
+        }
+    }
+
+    fun dismiss(key: String) {
+        try {
+            cancelNotification(key)
+        } catch (_: Exception) {
+        }
+    }
+}

@@ -1,0 +1,19 @@
+*{box-sizing:border-box}
+html,body{margin:0;background:transparent;font:14px/1.4 "Segoe UI Variable","Segoe UI",system-ui,sans-serif;color:#fff;overflow:hidden}
+.card{margin:0;padding:14px 16px;border-radius:18px;background:linear-gradient(160deg,rgba(4,52,44,.94),rgba(12,68,124,.94) 55%,rgba(38,33,92,.94));border:1px solid rgba(255,255,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.4);position:relative}
+.x{position:absolute;top:8px;right:10px;border:0;background:none;color:rgba(255,255,255,.7);font-size:20px;line-height:1;cursor:pointer}
+.x:hover{color:#fff}
+.body{cursor:pointer;padding-right:18px}
+.hdr{display:flex;align-items:center;gap:8px}
+#appic{display:none;width:22px;height:22px;border-radius:6px;margin:0;max-height:none}
+.title{font-weight:600}
+.sub{font-weight:500;font-size:13px;color:rgba(255,255,255,.9)}
+.sub:empty{display:none}
+.text{color:rgba(255,255,255,.85);font-size:13px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+img{display:none;margin-top:8px;max-width:100%;max-height:120px;border-radius:12px}
+.reply{display:flex;gap:6px;margin-top:10px}
+.reply.hidden{display:none}
+input{flex:1;min-width:0;font:inherit;font-size:13px;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.38);border-radius:14px;padding:6px 12px;outline:none}
+input:focus{border-color:#fff}
+::placeholder{color:rgba(255,255,255,.7)}
+button[type=submit]{font:inherit;font-size:13px;font-weight:600;background:#5DCAA5;color:#04342C;border:0;border-radius:14px;padding:0 14px;cursor:pointer}

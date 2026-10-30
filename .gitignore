@@ -1,0 +1,10 @@
+node_modules/
+pc/dist*/
+.gradle/
+build/
+local.properties
+*.log
+*.apk
+.idea/
+*.iml
+.DS_Store

@@ -1,0 +1,117 @@
+name: Release
+
+# Pousser un tag « vX.Y.Z » construit l'installateur Windows et l'APK Android,
+# puis les publie dans une release GitHub. Le lancement manuel (workflow_dispatch)
+# construit seulement les fichiers, disponibles dans les artefacts du run.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: pc/package-lock.json
+
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: pc
+        shell: bash
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+
+      - name: Install dependencies
+        working-directory: pc
+        run: npm ci
+
+      - name: Check syntax
+        working-directory: pc
+        shell: bash
+        run: |
+          for f in main.js preload.js toast-preload.js renderer/app.js renderer/toast.js; do
+            node --check "$f"
+          done
+
+      - name: Build installer
+        working-directory: pc
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: pc/dist/PhoneBridge-Setup-*.exe
+          if-no-files-found: error
+
+  android-apk:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk PhoneBridge.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: PhoneBridge.apk
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: [windows-installer, android-apk]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: artifacts
+        run: sha256sum * > SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          body: |
+            **Installation**
+            1. PC : lancez `PhoneBridge-Setup-*.exe` (Windows peut afficher un avertissement car le fichier n'est pas signé : « Informations complémentaires », puis « Exécuter quand même »).
+            2. Téléphone Android : installez `PhoneBridge.apk`.
+            3. Scannez le QR code de la fenêtre PC avec l'application.
+
+            **Install**
+            1. PC: run `PhoneBridge-Setup-*.exe` (Windows may warn because the file is unsigned: "More info", then "Run anyway").
+            2. Android phone: install `PhoneBridge.apk`.
+            3. Scan the QR code shown by the PC app with the phone app.
+
+            `SHA256SUMS.txt` lets you verify the downloads.

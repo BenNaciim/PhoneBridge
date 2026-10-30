@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+<title>PhoneBridge</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div>
+
+<main id="pair" class="glass pair">
+  <h1>Connecter votre téléphone</h1>
+  <p class="muted">Sur le téléphone, ouvrez PhoneBridge puis scannez ce code. Les deux appareils doivent être sur le même Wi-Fi.</p>
+  <img id="qr" alt="QR code de jumelage" width="220" height="220">
+  <dl>
+    <dt>Adresse</dt><dd id="addr">…</dd>
+    <dt>Code</dt><dd id="code">…</dd>
+  </dl>
+  <p id="pairState" class="status">En attente du téléphone…</p>
+</main>
+
+<div id="app" class="grid hidden">
+  <nav class="glass rail" aria-label="Sections">
+    <button class="ri on" data-tab="messages" aria-label="Messages" title="Messages">
+      <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg>
+    </button>
+    <button class="ri" data-tab="calls" aria-label="Appels" title="Appels">
+      <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>
+      <span id="missedBadge" class="rbadge hidden"></span>
+    </button>
+    <button class="ri" data-tab="notifs" aria-label="Notifications" title="Notifications">
+      <svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l2 2H4zM10 21h4"/></svg>
+    </button>
+    <button class="ri bottom" data-tab="settings" aria-label="Réglages" title="Réglages">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
+    </button>
+  </nav>
+
+  <section class="glass col" id="callsCol">
+    <header>Appels</header>
+    <div class="scroll" id="calls"></div>
+  </section>
+
+  <section class="glass col" id="settingsCol">
+    <header>Réglages</header>
+    <div class="scroll settings">
+      <h2>Apparence</h2>
+      <div class="row">
+        <span>Thème</span>
+        <div class="seg" id="themeSeg">
+          <button type="button" data-v="auto">Auto</button>
+          <button type="button" data-v="light">Clair</button>
+          <button type="button" data-v="dark">Sombre</button>
+        </div>
+      </div>
+      <div class="row"><span>Transparence du verre</span><input type="range" id="glass" min="4" max="40" step="1" aria-label="Transparence du verre"><output id="glassOut"></output></div>
+      <div class="row"><span>Flou du verre</span><input type="range" id="blur" min="8" max="40" step="1" aria-label="Flou du verre"><output id="blurOut"></output></div>
+
+      <h2>Alertes et démarrage</h2>
+      <label class="row"><span>Alertes sur le bureau (avec réponse rapide)</span><input type="checkbox" id="toasts"></label>
+      <label class="row"><span>Lancer PhoneBridge au démarrage de Windows</span><input type="checkbox" id="autostart"></label>
+
+      <h2>Notifications par application</h2>
+      <p class="muted small">Désactivez les applications dont vous ne voulez pas voir les notifications sur le PC. La liste se remplit au fil des notifications reçues.</p>
+      <div id="appList"></div>
+
+      <h2>Jumelage</h2>
+      <p class="muted small">Pour connecter un autre téléphone, scannez ce code depuis PhoneBridge.</p>
+      <div class="pairbox"><img id="qr2" alt="QR code de jumelage" width="140" height="140"><div class="mono" id="code2"></div></div>
+    </div>
+  </section>
+
+  <section class="glass col" id="threadsCol">
+    <header>Messages</header>
+    <div class="scroll" id="threads"></div>
+  </section>
+
+  <section class="glass col" id="chatCol">
+    <header id="chatTitle">Sélectionnez une conversation</header>
+    <div class="msgs" id="msgs"></div>
+    <form class="compose" id="composeForm" autocomplete="off">
+      <input id="composeInput" placeholder="Écrire un message" aria-label="Message">
+      <button id="sendBtn" type="submit">Envoyer</button>
+    </form>
+  </section>
+
+  <section class="glass col" id="notifCol">
+    <header>Notifications <button id="clearNotifs" class="link" type="button">Tout effacer</button></header>
+    <div class="scroll" id="notifs"></div>
+    <div class="state"><span class="dot" id="dot"></span><span id="stateText">Connecté</span></div>
+  </section>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
