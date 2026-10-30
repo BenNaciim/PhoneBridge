@@ -128,6 +128,18 @@ html[data-theme=light] .chip.on{color:#fff}
 .pairbox{display:flex;align-items:center;gap:16px}
 .pairbox img{background:#fff;border-radius:12px;padding:6px}
 
+.plus{width:28px;height:28px;border-radius:10px;border:1px solid var(--field-line);background:var(--chip);font-size:18px;line-height:1;padding:0}
+.plus:hover{background:var(--hover)}
+.searchbar{padding:8px 10px 4px}
+.searchbar input,.newconv input{width:100%;background:var(--field);border:1px solid var(--field-line);border-radius:14px;color:var(--ink);padding:7px 12px;outline:none}
+.searchbar input:focus,.newconv input:focus{border-color:var(--ink)}
+.newconv{padding:4px 10px 8px;border-bottom:1px solid var(--line)}
+.suggest{margin-top:6px;display:flex;flex-direction:column;gap:2px;max-height:220px;overflow-y:auto}
+.sug{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:12px;cursor:pointer;text-align:left;border:0;background:none;width:100%}
+.sug:hover,.sug.on{background:var(--hover)}
+.sug .av{width:28px;height:28px;font-size:10px}
+.sug small{color:var(--soft);display:block;font-size:11px}
+.tsnip mark{background:rgba(250,199,117,.55);color:inherit;border-radius:3px;padding:0 1px}
 .attach{flex:none;width:38px;border:0;border-radius:16px;background:var(--chip);display:flex;align-items:center;justify-content:center}
 .attach svg{width:20px;height:20px;fill:none;stroke:var(--soft);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .attach:hover{background:var(--hover)}

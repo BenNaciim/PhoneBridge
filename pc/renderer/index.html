@@ -83,7 +83,12 @@
   </section>
 
   <section class="glass col" id="threadsCol">
-    <header>Messages</header>
+    <header>Messages <button id="newConvBtn" class="plus" type="button" aria-label="Nouvelle conversation" title="Nouvelle conversation (Ctrl+N)">+</button></header>
+    <div class="searchbar"><input id="searchInput" type="search" placeholder="Rechercher (Ctrl+K)" aria-label="Rechercher une conversation" autocomplete="off"></div>
+    <div class="newconv hidden" id="newConv">
+      <input id="newTo" placeholder="Nom ou numéro" aria-label="Destinataire" autocomplete="off">
+      <div class="suggest" id="newSuggest"></div>
+    </div>
     <div class="chips hidden" id="threadChips"></div>
     <div class="scroll" id="threads"></div>
   </section>

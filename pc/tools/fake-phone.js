@@ -76,6 +76,13 @@ ws.on('message', (raw) => {
       ]
     });
   }
+  if (m.t === 'get_contacts') {
+    send({ t: 'contacts', contacts: [
+      { name: 'Élodie Martin', number: '06 11 22 33 44' }, { name: 'Maman', number: '+33698765432' },
+      { name: 'Paul Durand', number: '+33 7 55 44 33 22' }, { name: 'Sarah', number: '+33612345678' }
+    ] });
+  }
+  if (m.t === 'send_sms') console.log('SMS vers', m.to, ':', m.body);
   if (m.t === 'send_mms') {
     const bytes = Buffer.from(m.data || '', 'base64');
     console.log(`MMS reçu : ${bytes.length} octets, ${m.mime}, jpeg=${bytes[0] === 0xff && bytes[1] === 0xd8}, vers ${m.to}`);

@@ -32,6 +32,29 @@ object SmsReader {
         putInt(ContentResolver.QUERY_ARG_LIMIT, limit)
     }
 
+    /** Contacts avec numéro, triés par nom, un seul par numéro (pour choisir un destinataire sur le PC). */
+    fun contacts(ctx: Context): JSONArray {
+        val out = JSONArray()
+        val seen = HashSet<String>()
+        try {
+            ctx.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null, null, ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " COLLATE NOCASE ASC"
+            )?.use { c ->
+                while (c.moveToNext() && out.length() < 3000) {
+                    val name = c.getString(0) ?: continue
+                    val number = c.getString(1) ?: continue
+                    val key = number.filter { it.isDigit() }.takeLast(9)
+                    if (key.length < 3 || !seen.add(key)) continue
+                    out.put(JSONObject().put("name", name).put("number", number))
+                }
+            }
+        } catch (_: SecurityException) {
+        }
+        return out
+    }
+
     fun threads(ctx: Context): JSONArray {
         val out = JSONArray()
         val seen = LinkedHashMap<Long, JSONObject>()

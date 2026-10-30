@@ -24,6 +24,7 @@ Pas de compte Microsoft, pas de cloud, pas de serveur externe : le téléphone e
 ## Fonctions
 
 - **Messages** : lecture et envoi de SMS, réception et envoi de photos (MMS, bouton trombone), réponse depuis le PC.
+- **Recherche et nouvelle conversation** : barre de recherche (Ctrl+K) dans les noms, numéros et messages ; bouton « + » (Ctrl+N) pour écrire à un contact du téléphone ou à un numéro.
 - **Messageries** : les conversations WhatsApp, Messenger, Telegram… apparaissent dans la liste des messages, avec SMS, regroupées par contact, pastille de l'application et filtres. Réponse depuis le PC via la notification.
 - **Notifications** : toutes celles du téléphone, avec l'icône de l'application, réponse directe quand l'application la propose.
 - **Effacer d'un geste** : glissez deux doigts sur le pavé tactile pour effacer une notification, ici et sur le téléphone.
@@ -124,6 +125,7 @@ No Microsoft account, no cloud, no external server: the phone and the PC talk di
 ## Features
 
 - **Messages**: read and send SMS, receive and send photos (MMS, paperclip button), reply from the PC.
+- **Search and new conversation**: search bar (Ctrl+K) across names, numbers and messages; "+" button (Ctrl+N) to write to a phone contact or any number.
 - **Messaging apps**: WhatsApp, Messenger, Telegram… conversations show up in the message list next to SMS, grouped per contact, with an app badge and filters. Reply from the PC through the notification.
 - **Notifications**: everything your phone shows, with the app's icon, and direct replies when the app supports them.
 - **Swipe to dismiss**: swipe two fingers on the touchpad to clear a notification, on the PC and on the phone.

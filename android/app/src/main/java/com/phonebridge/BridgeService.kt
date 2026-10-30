@@ -293,6 +293,7 @@ class BridgeService : Service() {
             }
             "send_sms" -> sendSms(m.optString("to"), m.optString("body"))
             "send_mms" -> sendMms(m)
+            "get_contacts" -> Thread { Relay.send(JSONObject().put("t", "contacts").put("contacts", SmsReader.contacts(this))) }.start()
             "reply_notif" -> NotifListener.instance?.reply(m.optString("key"), m.optString("text"))
             "dismiss_notif" -> NotifListener.instance?.dismiss(m.optString("key"))
         }

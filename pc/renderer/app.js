@@ -2,7 +2,7 @@ const PALETTE = [['#CECBF6', '#3C3489'], ['#F5C4B3', '#712B13'], ['#9FE1CB', '#0
 const KIND = { missed: 'Appel en absence', in: 'Appel reçu', out: 'Appel émis', rejected: 'Appel refusé', voicemail: 'Message vocal' };
 
 const state = {
-  icons: {}, threads: [], msgs: {}, notifs: [], calls: [], seenCallId: 0, cur: null, filter: 'all',
+  icons: {}, threads: [], msgs: {}, notifs: [], calls: [], contacts: [], seenCallId: 0, cur: null, filter: 'all',
   connected: false, device: '', battery: null,
   settings: { theme: 'auto', glass: 0.14, blur: 22, toasts: true, autostart: true, muted: {}, apps: {} }
 };
@@ -117,17 +117,50 @@ function renderFilters() {
   box.classList.toggle('hidden', sources.length < 3);
 }
 
+/** Minuscules sans accents : « é » trouve « e ». */
+const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const digits = (s) => String(s || '').replace(/\D/g, '');
+/** Deux numéros sont les mêmes si leurs 9 derniers chiffres le sont (« 06… » et « +33 6… »). */
+const sameNumber = (a, b) => {
+  const x = digits(a), y = digits(b);
+  return x.length >= 6 && y.length >= 6 && x.slice(-9) === y.slice(-9);
+};
+
+/** Cherche dans le nom, le numéro, le dernier message et les messages déjà chargés ; renvoie l'extrait à montrer. */
+function searchHit(t, q) {
+  if (!q) return t.snippet || '';
+  if (fold(t.name).includes(q) || fold(t.address).includes(q) || (digits(q) && digits(t.address).includes(digits(q)))) return t.snippet || '';
+  if (fold(t.snippet).includes(q)) return t.snippet;
+  const m = (state.msgs[t.id] || []).find((x) => fold(x.body).includes(q));
+  return m ? m.body : null;
+}
+
+/** Texte avec la recherche surlignée (nœuds DOM, pas de HTML). */
+function highlighted(text, q) {
+  const box = el('div', 'tsnip');
+  const raw = String(text || '');
+  const i = q ? fold(raw).indexOf(q) : -1;
+  if (i < 0 || fold(raw).length !== raw.length) { box.textContent = raw; return box; }
+  box.append(document.createTextNode(raw.slice(0, i)), el('mark', null, raw.slice(i, i + q.length)), document.createTextNode(raw.slice(i + q.length)));
+  return box;
+}
+
 function renderThreads() {
   renderFilters();
   const box = $('threads');
   box.replaceChildren();
-  const list = state.threads.filter((t) =>
-    threadVisible(t) && (state.filter === 'all' || (state.filter === 'sms' ? !isApp(t) : t.pkg === state.filter)));
-  if (!list.length) box.append(el('p', 'empty', 'Aucune conversation'));
-  for (const t of list) {
+  const q = fold($('searchInput').value.trim());
+  const list = [];
+  for (const t of state.threads) {
+    if (!threadVisible(t) || !(state.filter === 'all' || (state.filter === 'sms' ? !isApp(t) : t.pkg === state.filter))) continue;
+    const hit = searchHit(t, q);
+    if (hit !== null) list.push({ t, hit });
+  }
+  if (!list.length) box.append(el('p', 'empty', q ? 'Aucun résultat' : 'Aucune conversation'));
+  for (const { t, hit } of list) {
     const row = el('div', 'thread' + (t.id === state.cur ? ' on' : ''));
     const info = el('div', 'tinfo');
-    info.append(el('div', 'tname', t.name || t.address), el('div', 'tsnip', t.snippet || ''));
+    info.append(el('div', 'tname', t.name || t.address), highlighted(hit, q));
     row.append(avatarWithApp(t), info);
     if (t.unread) row.append(el('span', 'badge', String(t.unread)));
     row.addEventListener('click', () => openThread(t.id));
@@ -181,7 +214,88 @@ function openThread(id) {
   showTab('messages');
   renderThreads();
   renderMsgs();
-  if (t && !isApp(t)) window.bridge.send({ t: 'get_thread', threadId: id });
+  if (t && !isApp(t) && !t.temp) window.bridge.send({ t: 'get_thread', threadId: id });
+  dropEmptyTemps(id);
+}
+
+/* Nouvelle conversation : un fil provisoire (« new: ») jusqu'au premier envoi, puis remplacé par le vrai fil du téléphone */
+const newId = (number) => 'new:' + digits(number);
+
+function dropEmptyTemps(keepId) {
+  const before = state.threads.length;
+  state.threads = state.threads.filter((t) => !t.temp || t.id === keepId || (state.msgs[t.id] || []).length);
+  if (state.threads.length !== before) renderThreads();
+}
+
+function startConversation(number, name) {
+  const existing = state.threads.find((t) => !isApp(t) && sameNumber(t.address, number));
+  closeNewConv();
+  if (existing) { openThread(existing.id); $('composeInput').focus(); return; }
+  const id = newId(number);
+  if (!state.threads.some((t) => t.id === id)) {
+    state.threads.unshift({ id, kind: 'sms', temp: true, address: number, name: name || number, snippet: 'Nouvelle conversation', date: Date.now(), unread: 0 });
+  }
+  openThread(id);
+  $('composeInput').focus();
+}
+
+/** Premier message d'un fil provisoire : on redemande la liste pour retrouver le vrai fil, s'il existe déjà. */
+function refreshAfterSend(t) {
+  if (t.temp) setTimeout(() => window.bridge.send({ t: 'get_threads' }), 4000);
+}
+
+function closeNewConv() {
+  $('newConv').classList.add('hidden');
+  $('newTo').value = '';
+  $('newSuggest').replaceChildren();
+}
+
+function renderSuggestions() {
+  const box = $('newSuggest');
+  box.replaceChildren();
+  const raw = $('newTo').value.trim();
+  const q = fold(raw);
+  if (!q) return;
+  const found = [];
+  for (const c of state.contacts) {
+    if (fold(c.name).includes(q) || (digits(raw) && digits(c.number).includes(digits(raw)))) found.push(c);
+    if (found.length >= 8) break;
+  }
+  if (digits(raw).length >= 3 && /^[+\d\s().-]+$/.test(raw)) found.push({ name: null, number: raw });
+  for (const c of found) {
+    const b = el('button', 'sug');
+    b.type = 'button';
+    const info = el('div');
+    info.append(document.createTextNode(c.name || `Écrire au ${c.number}`));
+    if (c.name) info.append(el('small', null, c.number));
+    b.append(avatar(c.name || c.number), info);
+    b.addEventListener('click', () => startConversation(c.number, c.name));
+    box.append(b);
+  }
+  if (!found.length) box.append(el('p', 'muted small', state.contacts.length ? 'Aucun contact trouvé' : 'Contacts en cours de chargement…'));
+}
+
+function initSearchAndNew() {
+  $('searchInput').addEventListener('input', renderThreads);
+  $('searchInput').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('searchInput').value = ''; renderThreads(); } });
+  $('newConvBtn').addEventListener('click', () => {
+    const open = $('newConv').classList.contains('hidden');
+    if (!open) { closeNewConv(); return; }
+    showTab('messages');
+    $('newConv').classList.remove('hidden');
+    if (!state.contacts.length) window.bridge.send({ t: 'get_contacts' });
+    $('newTo').focus();
+  });
+  $('newTo').addEventListener('input', renderSuggestions);
+  $('newTo').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeNewConv();
+    if (e.key === 'Enter') { e.preventDefault(); const first = $('newSuggest').querySelector('.sug'); if (first) first.click(); }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (e.key === 'k') { e.preventDefault(); showTab('messages'); $('searchInput').focus(); $('searchInput').select(); }
+    if (e.key === 'n') { e.preventDefault(); $('newConvBtn').click(); }
+  });
 }
 
 /** Fusionne les messages d'une notification de messagerie dans sa conversation (sans doublons). */
@@ -406,12 +520,25 @@ function addOutgoing(threadId, body, images) {
 
 function onPhone(m) {
   switch (m.t) {
-    case 'sms_list':
-      state.threads = [
-        ...state.threads.filter(isApp),
-        ...(m.threads || []).map((t) => ({ ...t, kind: 'sms' }))
-      ].sort((a, b) => (b.date || 0) - (a.date || 0));
+    case 'sms_list': {
+      const real = (m.threads || []).map((t) => ({ ...t, kind: 'sms' }));
+      // Un fil provisoire est remplacé par le vrai fil dès que le téléphone le connaît.
+      const temps = [];
+      for (const t of state.threads.filter((x) => x.temp)) {
+        const r = real.find((x) => sameNumber(x.address, t.address));
+        if (r) {
+          if (state.cur === t.id) { state.cur = r.id; window.bridge.send({ t: 'get_thread', threadId: r.id }); }
+          state.msgs[r.id] = state.msgs[r.id] || state.msgs[t.id] || [];
+        } else if ((state.msgs[t.id] || []).length || state.cur === t.id) temps.push(t);
+      }
+      state.threads = [...state.threads.filter(isApp), ...temps, ...real].sort((a, b) => (b.date || 0) - (a.date || 0));
       renderThreads();
+      if (state.cur) renderMsgs();
+      break;
+    }
+    case 'contacts':
+      state.contacts = m.contacts || [];
+      if (!$('newConv').classList.contains('hidden')) renderSuggestions();
       break;
     case 'sms_thread':
       state.msgs[m.threadId] = (m.messages || []).sort((a, b) => a.date - b.date);
@@ -503,6 +630,7 @@ async function init() {
       const a = state.attach;
       window.bridge.send({ t: 'send_mms', to: t.address, threadId: t.id, body, mime: 'image/jpeg', data: a.base64 });
       addOutgoing(t.id, body, [a.dataUrl]);
+      refreshAfterSend(t);
       clearAttach();
       input.value = '';
       return;
@@ -515,6 +643,7 @@ async function init() {
       window.bridge.send({ t: 'send_sms', to: t.address, threadId: t.id, body });
     }
     addOutgoing(t.id, body);
+    refreshAfterSend(t);
     input.value = '';
   });
   $('clearNotifs').addEventListener('click', () => {
@@ -541,6 +670,7 @@ async function init() {
   $('autoUpdate').addEventListener('change', (e) => window.bridge.setSettings({ autoUpdate: e.target.checked }));
   initUpdates();
   initAttach();
+  initSearchAndNew();
 
   renderThreads();
   renderMsgs();
