@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src data:; style-src 'self'; script-src 'self'">
 <title>PhoneBridge</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -119,6 +119,8 @@
     <div class="state"><span class="dot" id="dot"></span><span id="stateText">Connecté</span></div>
   </section>
 </div>
+
+<div class="lightbox hidden" id="lightbox" role="dialog" aria-label="Photo"><img id="lightboxImg" alt="Photo agrandie"></div>
 
 <script src="app.js"></script>
 </body>

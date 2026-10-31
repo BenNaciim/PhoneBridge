@@ -87,7 +87,7 @@ object SmsReader {
         }
         for (s in MmsReader.recentSummaries(ctx, 150)) {
             val t = seen[s.threadId]
-            val snippet = s.text.ifEmpty { "Photo" }
+            val snippet = s.text.ifEmpty { s.label }
             if (t == null) {
                 val address = MmsReader.addressOf(ctx, s.id, s.out) ?: continue
                 seen[s.threadId] = JSONObject()
@@ -137,6 +137,7 @@ object SmsReader {
                     .put("date", m.date)
                     .put("out", m.out)
                     .put("images", org.json.JSONArray(m.images))
+                    .put("videos", org.json.JSONArray(m.videos))
             )
         }
         return out

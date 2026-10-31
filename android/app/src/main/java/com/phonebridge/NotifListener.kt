@@ -6,6 +6,7 @@ import android.app.RemoteInput
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Telephony
 import android.util.Base64
@@ -96,21 +97,61 @@ class NotifListener : NotificationListenerService() {
             val arr = ex.getParcelableArray(key) ?: continue
             for (p in arr) {
                 val b = p as? Bundle ?: continue
-                val t = b.getCharSequence("text")?.toString() ?: continue
+                val mime = b.getString("type") ?: ""
+                val uri = b.get("uri") as? Uri
+                var t = b.getCharSequence("text")?.toString() ?: ""
+                if (t.isEmpty() && uri == null) continue
                 val person = b.get("sender_person") as? Person
                 val sender = person?.name?.toString() ?: b.getCharSequence("sender")?.toString() ?: ""
                 val mine = (me != null && person != null && person.key != null && person.key == me.key) ||
                     (myName != null && sender.isNotEmpty() && sender == myName)
-                msgs.put(
-                    JSONObject().put("text", t).put("time", b.getLong("time", sbn.postTime))
-                        .put("sender", sender).put("out", mine)
-                )
+                val o = JSONObject().put("time", b.getLong("time", sbn.postTime)).put("sender", sender).put("out", mine)
+                // Photo ou vidéo jointe : lue si l'application nous en laisse l'accès, sinon une simple mention.
+                if (uri != null && mime.startsWith("image/")) {
+                    val img = cachedMedia(uri.toString()) { Media.imageFromUri(this, uri) }
+                    if (img != null) o.put("images", JSONArray().put(img)) else if (t.isEmpty()) t = "📷 Photo"
+                } else if (uri != null && mime.startsWith("video/")) {
+                    val v = cachedMedia(uri.toString()) { Media.videoFromUri(this, uri, mime) }
+                    if (v != null) o.put("videos", JSONArray().put(v)) else if (t.isEmpty()) t = "🎥 Vidéo"
+                }
+                msgs.put(o.put("text", t))
             }
         }
         if (msgs.length() == 0 && text.isNotEmpty()) {
             msgs.put(JSONObject().put("text", text).put("time", sbn.postTime).put("sender", title).put("out", false))
         }
+        // Notification « grande image » (BigPictureStyle) : la photo est jointe au dernier message reçu.
+        pictureOf(ex)?.let { pic ->
+            if (msgs.length() == 0) msgs.put(JSONObject().put("text", "").put("time", sbn.postTime).put("sender", title).put("out", false))
+            val last = msgs.getJSONObject(msgs.length() - 1)
+            if (!last.has("images")) last.put("images", JSONArray().put(pic))
+        }
         return JSONObject().put("id", "${sbn.packageName}|$name").put("name", name).put("group", group).put("messages", msgs)
+    }
+
+    /** Médias déjà lus (par adresse), pour ne pas les redécoder à chaque republication de la notification. */
+    private val mediaCache = object : LinkedHashMap<String, String?>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String?>) = size > 24
+    }
+
+    private fun cachedMedia(key: String, load: () -> String?): String? {
+        if (mediaCache.containsKey(key)) return mediaCache[key]
+        return load().also { mediaCache[key] = it }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun pictureOf(ex: Bundle): String? = try {
+        val bmp = ex.get(Notification.EXTRA_PICTURE) as? Bitmap
+            ?: (ex.get(Notification.EXTRA_PICTURE_ICON) as? android.graphics.drawable.Icon)?.loadDrawable(this)?.let { d ->
+                Bitmap.createBitmap(maxOf(1, d.intrinsicWidth), maxOf(1, d.intrinsicHeight), Bitmap.Config.ARGB_8888).also {
+                    val cv = android.graphics.Canvas(it)
+                    d.setBounds(0, 0, cv.width, cv.height)
+                    d.draw(cv)
+                }
+            }
+        bmp?.let { Media.jpegDataUrl(it) }
+    } catch (_: Exception) {
+        null
     }
 
     private val iconCache = HashMap<String, String>()

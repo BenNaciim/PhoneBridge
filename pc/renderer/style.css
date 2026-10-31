@@ -62,6 +62,10 @@ body{font:14px/1.4 "Segoe UI Variable","Segoe UI",system-ui,sans-serif;color:var
 .m.in{background:var(--in-bg);color:var(--in-ink);border:1px solid var(--glass-line);align-self:flex-start}
 .m.out{background:var(--out-bg);color:var(--out-ink);align-self:flex-end}
 .m img{display:block;max-width:100%;max-height:240px;border-radius:12px;margin-bottom:4px}
+.m video{display:block;max-width:100%;max-height:280px;border-radius:12px;margin-bottom:4px;background:#000}
+.m img{cursor:zoom-in}
+.lightbox{position:fixed;inset:0;z-index:20;background:rgba(0,10,30,.82);display:flex;align-items:center;justify-content:center;cursor:zoom-out}
+.lightbox img{max-width:94vw;max-height:92vh;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
 .m time{display:block;font-size:11px;opacity:.65;margin-top:2px}
 .empty{margin:auto;color:var(--soft)}
 .compose{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)}

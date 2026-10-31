@@ -12,10 +12,13 @@ import java.io.ByteArrayOutputStream
 
 data class Mms(
     val id: Long, val threadId: Long, val date: Long, val out: Boolean,
-    val address: String, val body: String, val images: List<String>
+    val address: String, val body: String, val images: List<String>, val videos: List<String> = emptyList()
 )
 
-data class MmsSummary(val id: Long, val threadId: Long, val date: Long, val out: Boolean, val text: String, val hasImage: Boolean)
+/** [label] : « Photo » ou « Vidéo », pour l'aperçu d'un message sans texte. */
+data class MmsSummary(val id: Long, val threadId: Long, val date: Long, val out: Boolean, val text: String, val hasMedia: Boolean, val label: String)
+
+private data class MmsContent(val text: String, val images: List<String>, val videos: List<String>, val hasMedia: Boolean, val label: String)
 
 object MmsReader {
     private val URI = Uri.parse("content://mms")
@@ -70,49 +73,36 @@ object MmsReader {
         ""
     }
 
-    private fun encodeImage(ctx: Context, partId: Long): String? = try {
-        val u = Uri.parse("content://mms/part/$partId")
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        ctx.contentResolver.openInputStream(u)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
-        val bmp = ctx.contentResolver.openInputStream(u)?.use {
-            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-        }
-        if (bmp == null) {
-            null
-        } else {
-            val scale = 900f / maxOf(bmp.width, bmp.height)
-            val small = if (scale < 1f) Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true) else bmp
-            val bos = ByteArrayOutputStream()
-            small.compress(Bitmap.CompressFormat.JPEG, 72, bos)
-            "data:image/jpeg;base64," + Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
-        }
-    } catch (_: Exception) {
-        null
-    }
-
-    /** Texte et images d'un MMS ; les images ne sont décodées que si [withImages]. */
-    private fun content(ctx: Context, id: Long, withImages: Boolean): Triple<String, List<String>, Boolean> {
+    /** Texte, photos et vidéos d'un MMS ; les médias ne sont lus que si [withMedia]. */
+    private fun content(ctx: Context, id: Long, withMedia: Boolean): MmsContent {
         val text = StringBuilder()
         val images = ArrayList<String>()
+        val videos = ArrayList<String>()
         var hasImage = false
+        var hasVideo = false
+        var videoMissing = false
         try {
             ctx.contentResolver.query(PART_URI, arrayOf("_id", "ct", "text", "_data"), "mid = ?", arrayOf(id.toString()), null)?.use { c ->
                 while (c.moveToNext()) {
                     val partId = c.getLong(0)
                     val ct = c.getString(1) ?: ""
+                    val uri = Uri.parse("content://mms/part/$partId")
                     if (ct == "text/plain") {
                         text.append(c.getString(2) ?: if (c.getString(3) != null) readText(ctx, partId) else "")
                     } else if (ct.startsWith("image/")) {
                         hasImage = true
-                        if (withImages && images.size < 4) encodeImage(ctx, partId)?.let { images.add(it) }
+                        if (withMedia && images.size < 4) Media.imageFromUri(ctx, uri)?.let { images.add(it) }
+                    } else if (ct.startsWith("video/")) {
+                        hasVideo = true
+                        val v = if (withMedia && videos.size < 2) Media.videoFromUri(ctx, uri, ct) else null
+                        if (v != null) videos.add(v) else videoMissing = true
                     }
                 }
             }
         } catch (_: Exception) {
         }
-        return Triple(text.toString(), images, hasImage)
+        if (videoMissing && withMedia) text.append(if (text.isEmpty()) "🎥 Vidéo (trop lourde pour être affichée sur le PC)" else "\n🎥 Vidéo (trop lourde pour être affichée sur le PC)")
+        return MmsContent(text.toString(), images, videos, hasImage || hasVideo, if (hasVideo && !hasImage) "Vidéo" else "Photo")
     }
 
     fun recentSummaries(ctx: Context, limit: Int): List<MmsSummary> {
@@ -121,9 +111,9 @@ object MmsReader {
             query(ctx, URI, arrayOf("_id", "thread_id", "date", "msg_box"), "msg_box IN (1, 2)", null, "date", limit)?.use { c ->
                 while (c.moveToNext() && out.size < limit) {
                     val id = c.getLong(0)
-                    val (text, _, hasImage) = content(ctx, id, false)
-                    if (text.isEmpty() && !hasImage) continue
-                    out.add(MmsSummary(id, c.getLong(1), c.getLong(2) * 1000, c.getInt(3) == 2, text, hasImage))
+                    val m = content(ctx, id, false)
+                    if (m.text.isEmpty() && !m.hasMedia) continue
+                    out.add(MmsSummary(id, c.getLong(1), c.getLong(2) * 1000, c.getInt(3) == 2, m.text, m.hasMedia, m.label))
                 }
             }
         } catch (_: Exception) {
@@ -142,9 +132,9 @@ object MmsReader {
                 while (c.moveToNext() && n < 60) {
                     n++
                     val id = c.getLong(0)
-                    val (text, images, hasImage) = content(ctx, id, out.size < imageBudget)
-                    if (text.isEmpty() && !hasImage) continue
-                    out.add(Mms(id, threadId, c.getLong(1) * 1000, c.getInt(2) == 2, "", text, images))
+                    val m = content(ctx, id, out.size < imageBudget)
+                    if (m.text.isEmpty() && !m.hasMedia) continue
+                    out.add(Mms(id, threadId, c.getLong(1) * 1000, c.getInt(2) == 2, "", m.text, m.images, m.videos))
                 }
             }
         } catch (_: Exception) {
@@ -163,10 +153,10 @@ object MmsReader {
                 while (c.moveToNext()) {
                     val id = c.getLong(0)
                     if (id in skip) continue
-                    val (text, images, hasImage) = content(ctx, id, true)
-                    if (text.isEmpty() && !hasImage) continue
+                    val m = content(ctx, id, true)
+                    if (m.text.isEmpty() && !m.hasMedia) continue
                     val address = addressOf(ctx, id, false) ?: continue
-                    out.add(Mms(id, c.getLong(1), c.getLong(2) * 1000, false, address, text, images))
+                    out.add(Mms(id, c.getLong(1), c.getLong(2) * 1000, false, address, m.text, m.images, m.videos))
                 }
             }
         } catch (_: Exception) {

@@ -47,7 +47,9 @@ ws.on('message', (raw) => {
         messages: [
           { text: 'Salut ! Tu es dispo ce soir ?', time: now - 300000, sender: 'Sarah', out: false },
           { text: 'Oui, vers 19h', time: now - 240000, sender: 'Moi', out: true },
-          { text: 'On se retrouve à quelle heure ?', time: now - 60000, sender: 'Sarah', out: false }
+          { text: 'On se retrouve à quelle heure ?', time: now - 60000, sender: 'Sarah', out: false },
+          { text: '', time: now - 45000, sender: 'Sarah', out: false, images: [icon] },
+          { text: '🎥 Vidéo', time: now - 40000, sender: 'Sarah', out: false, videos: ['data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDE='] }
         ]
       }
     });

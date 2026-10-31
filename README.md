@@ -24,6 +24,7 @@ Pas de compte Microsoft, pas de cloud, pas de serveur externe : le téléphone e
 ## Fonctions
 
 - **Messages** : lecture et envoi de SMS, réception et envoi de photos (MMS, bouton trombone), réponse depuis le PC.
+- **Photos et vidéos reçues** : affichées dans la conversation (clic sur une photo pour l'agrandir, lecteur pour les vidéos de 6 Mo au plus) pour les MMS et, quand l'application en laisse l'accès, pour WhatsApp, Messenger…
 - **Recherche et nouvelle conversation** : barre de recherche (Ctrl+K) dans les noms, numéros et messages ; bouton « + » (Ctrl+N) pour écrire à un contact du téléphone ou à un numéro.
 - **Messageries** : les conversations WhatsApp, Messenger, Telegram… apparaissent dans la liste des messages, avec SMS, regroupées par contact, pastille de l'application et filtres. Réponse depuis le PC via la notification.
 - **Notifications** : toutes celles du téléphone, avec l'icône de l'application, réponse directe quand l'application la propose.
@@ -73,7 +74,7 @@ Pas de compte Microsoft, pas de cloud, pas de serveur externe : le téléphone e
 
 - Les SMS envoyés depuis le PC partent bien, mais Android ne les range dans « Envoyés » que si PhoneBridge est l'application SMS par défaut.
 - MMS : une photo à la fois, réduite à ≈ 300 Ko ; l'envoi demande les données mobiles et des réglages MMS valides chez l'opérateur. Pas d'envoi de photos par WhatsApp, Messenger… Appels : affichage seul, pas de rappel depuis le PC.
-- Messageries : seuls les messages passés par une notification sont visibles (pas d'historique plus ancien ni de photos), conservés en mémoire tant que l'application est ouverte. On ne peut répondre que tant que la notification existe sur le téléphone.
+- Messageries : seuls les messages passés par une notification sont visibles (pas d'historique plus ancien ; les photos et vidéos seulement si l'application laisse PhoneBridge y accéder, sinon une simple mention « Photo »), conservés en mémoire tant que l'application est ouverte. On ne peut répondre que tant que la notification existe sur le téléphone.
 - Le téléphone et le PC doivent être sur le même réseau local.
 - Certains téléphones coupent les applications en arrière-plan : activez « Rester actif en arrière-plan » dans l'application.
 - L'installateur n'est pas signé (avertissement SmartScreen).
@@ -125,6 +126,7 @@ No Microsoft account, no cloud, no external server: the phone and the PC talk di
 ## Features
 
 - **Messages**: read and send SMS, receive and send photos (MMS, paperclip button), reply from the PC.
+- **Received photos and videos**: shown in the conversation (click a photo to enlarge it, player for videos up to 6 MB) for MMS and, when the app allows access, for WhatsApp, Messenger…
 - **Search and new conversation**: search bar (Ctrl+K) across names, numbers and messages; "+" button (Ctrl+N) to write to a phone contact or any number.
 - **Messaging apps**: WhatsApp, Messenger, Telegram… conversations show up in the message list next to SMS, grouped per contact, with an app badge and filters. Reply from the PC through the notification.
 - **Notifications**: everything your phone shows, with the app's icon, and direct replies when the app supports them.
@@ -174,7 +176,7 @@ No Microsoft account, no cloud, no external server: the phone and the PC talk di
 
 - SMS sent from the PC are delivered, but Android only files them under "Sent" if PhoneBridge is the default SMS app.
 - MMS: one photo at a time, shrunk to about 300 KB; sending needs mobile data and valid carrier MMS settings. No photo sending through WhatsApp, Messenger… Calls are display-only, with no call-back from the PC.
-- Messaging apps: only messages that came through a notification are visible (no older history, no photos), kept in memory while the app is open. You can reply only while the notification still exists on the phone.
+- Messaging apps: only messages that came through a notification are visible (no older history; photos and videos only if the app lets PhoneBridge read them, otherwise just a "Photo" mention), kept in memory while the app is open. You can reply only while the notification still exists on the phone.
 - The phone and the PC must be on the same local network.
 - Some phones kill background apps: turn on "Stay active in the background" in the app.
 - The installer is unsigned (SmartScreen warning).

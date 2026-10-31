@@ -194,10 +194,19 @@ function renderMsgs() {
     const b = el('div', 'm ' + (m.out ? 'out' : 'in'));
     for (const src of m.images || []) {
       const img = el('img');
-      img.alt = 'Photo reçue';
+      img.alt = m.out ? 'Photo envoyée' : 'Photo reçue';
       img.src = src;
       img.addEventListener('load', () => { box.scrollTop = box.scrollHeight; });
+      img.addEventListener('click', () => { $('lightboxImg').src = src; $('lightbox').classList.remove('hidden'); });
       b.append(img);
+    }
+    for (const src of m.videos || []) {
+      const v = el('video');
+      v.controls = true;
+      v.preload = 'metadata';
+      v.src = src;
+      v.addEventListener('loadedmetadata', () => { box.scrollTop = box.scrollHeight; });
+      b.append(v);
     }
     if (m.body) b.append(document.createTextNode(m.body));
     b.append(el('time', null, fmtTime(m.date)));
@@ -303,7 +312,7 @@ function addConv(m) {
   const c = m.conv;
   let t = state.threads.find((x) => x.id === c.id);
   if (!t) {
-    t = { id: c.id, kind: 'app', pkg: m.pkg, app: m.app, name: c.name, group: !!c.group, unread: 0, date: 0, seen: new Set() };
+    t = { id: c.id, kind: 'app', pkg: m.pkg, app: m.app, name: c.name, group: !!c.group, unread: 0, date: 0, seen: new Map() };
     state.threads.push(t);
     state.msgs[c.id] = [];
   }
@@ -312,17 +321,28 @@ function addConv(m) {
   const list = state.msgs[c.id];
   for (const x of c.messages || []) {
     const key = `${x.time}|${x.sender}|${x.text}`;
-    if (t.seen.has(key)) continue;
-    t.seen.add(key);
+    if (t.seen.has(key)) {
+      // Même message revu : on complète seulement avec la photo ou la vidéo si elles arrivent après coup.
+      const old = t.seen.get(key);
+      if (old) {
+        if (!old.images && x.images) old.images = x.images;
+        if (!old.videos && x.videos) old.videos = x.videos;
+      }
+      continue;
+    }
+    t.seen.set(key, null);
     // Une réponse déjà envoyée depuis le PC revient dans la notification : on n'affiche pas la bulle en double.
     if (x.out && list.some((o) => o.out && o.body === x.text && Math.abs(o.date - x.time) < 300000)) continue;
-    list.push({ body: x.text, date: x.time, out: !!x.out, sender: x.sender });
+    const msg = { body: x.text, date: x.time, out: !!x.out, sender: x.sender, images: x.images, videos: x.videos };
+    t.seen.set(key, msg);
+    list.push(msg);
     if (!x.out && c.id !== state.cur) t.unread = (t.unread || 0) + 1;
   }
   list.sort((a, b) => a.date - b.date);
   const last = list[list.length - 1];
   if (last) {
-    t.snippet = (t.group && !last.out && last.sender ? last.sender + ' : ' : '') + last.body;
+    const what = last.body || (last.videos && last.videos.length ? '🎥 Vidéo' : last.images && last.images.length ? '📷 Photo' : '');
+    t.snippet = (t.group && !last.out && last.sender ? last.sender + ' : ' : '') + what;
     t.date = last.date;
   }
   state.threads.sort((a, b) => (b.date || 0) - (a.date || 0));
@@ -493,13 +513,13 @@ function showTab(tab) {
 
 function addIncoming(m) {
   const list = state.msgs[m.threadId] || (state.msgs[m.threadId] = []);
-  list.push({ id: m.id, body: m.body, date: m.date, out: false, images: m.images });
+  list.push({ id: m.id, body: m.body, date: m.date, out: false, images: m.images, videos: m.videos });
   let t = state.threads.find((x) => x.id === m.threadId);
   if (!t) {
     t = { id: m.threadId, kind: 'sms', address: m.address, name: m.name, unread: 0 };
     state.threads.unshift(t);
   }
-  t.snippet = m.body || (m.images && m.images.length ? 'Photo' : '');
+  t.snippet = m.body || (m.images && m.images.length ? 'Photo' : m.videos && m.videos.length ? 'Vidéo' : '');
   t.date = m.date;
   if (m.threadId !== state.cur) t.unread = (t.unread || 0) + 1;
   state.threads.sort((a, b) => b.date - a.date);
@@ -671,6 +691,8 @@ async function init() {
   initUpdates();
   initAttach();
   initSearchAndNew();
+  $('lightbox').addEventListener('click', () => $('lightbox').classList.add('hidden'));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('lightbox').classList.add('hidden'); });
 
   renderThreads();
   renderMsgs();

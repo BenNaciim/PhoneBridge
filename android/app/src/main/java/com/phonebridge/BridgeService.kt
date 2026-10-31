@@ -323,6 +323,7 @@ class BridgeService : Service() {
                     .put("name", SmsReader.contactName(this, m.address))
                     .put("body", m.body)
                     .put("images", JSONArray(m.images))
+                    .put("videos", JSONArray(m.videos))
                     .put("date", m.date)
             )
         }
